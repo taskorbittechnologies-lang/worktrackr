@@ -6142,7 +6142,7 @@ function renderAttendance(){
     ? 'Attendance <small>Team login/logout records</small>'
     : 'My Attendance <small>Your daily login &amp; logout time</small>';
 
-  // Month filter — last 3 months
+  // Month filter
   const monthSel = document.getElementById('att-month-filter');
   const months = [];
   for(let i=0;i<3;i++){
@@ -6152,285 +6152,269 @@ function renderAttendance(){
   if(!monthSel.value || !months.find(m=>m.val===monthSel.value)){
     monthSel.innerHTML = months.map(m=>`<option value="${m.val}">${m.label}</option>`).join('');
   }
-  const selMonth = monthSel.value || months[0].val;
 
-  // Employee filter (manager only)
+  if(isMgr) _renderAttendanceMgr();
+  else       _renderAttendanceEmp();
+}
+
+// ══════════════════════════════════════════════
+// MANAGER ATTENDANCE VIEW
+// ══════════════════════════════════════════════
+function _renderAttendanceMgr(){
+  const selMonth = document.getElementById('att-month-filter').value;
   const empFilterEl = document.getElementById('att-emp-filter');
   const empThEl     = document.getElementById('att-th-emp');
-  if(isMgr){
-    empFilterEl.style.display='block';
-    if(empThEl) empThEl.style.display='';
-    // Show source filter for managers
-    const srcFilterEl=document.getElementById('att-source-filter');
-    if(srcFilterEl) srcFilterEl.style.display='block';
-    const myEmps = db.employees.filter(e=>(e.managerIds||[e.managerId]).includes(CU.id));
-    empFilterEl.innerHTML = '<option value="all">👥 All Employees</option>' +
-      myEmps.map(e=>`<option value="${e.id}">${e.name}</option>`).join('');
-    document.getElementById('att-today-card').style.display='none';
-    document.getElementById('att-device-banner').style.display='none';
-    // Show sub-tab bar for managers
-    const _attTabsEl=document.getElementById('att-tabs'); if(_attTabsEl) _attTabsEl.style.display='flex';
-    // Show PC change requests panel
-    _renderPcRequests();
-    if(_attTab==='today'){
-      const _tp=document.getElementById('att-today-panel'); if(_tp) _tp.style.display='block';
-      const _st=document.getElementById('att-stats'); if(_st) _st.style.display='none';
-      renderTodayAttendance();
-    } else {
-      const _tp=document.getElementById('att-today-panel'); if(_tp) _tp.style.display='none';
-    }
+
+  // Show/hide correct UI elements
+  empFilterEl.style.display='block';
+  if(empThEl) empThEl.style.display='';
+  document.getElementById('att-source-filter').style.display='block';
+  document.getElementById('att-tabs').style.display='flex';
+  document.getElementById('att-today-card').style.display='none';
+  document.getElementById('att-device-banner').style.display='none';
+  document.getElementById('att-gps-banner').style.display='none';
+
+  // Populate employee filter
+  const myEmps = db.employees.filter(e=>(e.managerIds||[e.managerId]).includes(CU.id));
+  const curEmpVal = empFilterEl.value;
+  empFilterEl.innerHTML = '<option value="all">👥 All Employees</option>' +
+    myEmps.map(e=>`<option value="${e.id}">${e.name}</option>`).join('');
+  if(curEmpVal) empFilterEl.value = curEmpVal;
+  if(!empFilterEl.value) empFilterEl.value = 'all';
+
+  // PC change requests panel
+  _renderPcRequests();
+
+  // Tab switching
+  if(_attTab==='today'){
+    document.getElementById('att-today-panel').style.display='block';
+    document.getElementById('att-stats').style.display='none';
+    document.querySelector('#page-attendance table')?.closest('div')?.setAttribute('style','display:none');
+    renderTodayAttendance();
+    return; // today tab done — no need for records table
   } else {
-    empFilterEl.style.display='none';
-    if(empThEl) empThEl.style.display='none';
-    const srcFilterEl2=document.getElementById('att-source-filter');
-    if(srcFilterEl2) srcFilterEl2.style.display='none';
-    const _eAttTabsEl=document.getElementById('att-tabs'); if(_eAttTabsEl) _eAttTabsEl.style.display='none';
-    const _eTodayPanelEl=document.getElementById('att-today-panel'); if(_eTodayPanelEl) _eTodayPanelEl.style.display='none';
-    const _eStatsEl=document.getElementById('att-stats'); if(_eStatsEl) _eStatsEl.style.display='grid';
-
-    // GPS banner
-    _renderGpsBanner();
-
-    // Always show the today card immediately with current record data
-    _showTodayCard(true); // show card, hide buttons until PC verified
-
-    // Device banner — IP-based PC lock
-    const banner = document.getElementById('att-device-banner');
-    const registeredIp = getRegisteredIp(CU.empId);
-    const mobile = isMobileDevice();
-
-    if(mobile){
-      // Mobile: no IP check needed — GPS handles auth
-      banner.style.display='none';
-      _showTodayCard(); // show buttons for mobile
-    } else if(!registeredIp){
-      // PC not registered yet — show register button, keep Login/Logout hidden
-      banner.style.display='block';
-      banner.innerHTML=`<strong>🖥️ Register This PC</strong> — Your PC's IP address must be registered before you can mark attendance.<br><br>
-        <button onclick="registerDevice()" style="background:var(--blue);color:#fff;border:none;padding:8px 20px;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;font-family:'Poppins',sans-serif;">✅ Register This PC</button>`;
-      document.getElementById('att-punch-status').textContent='Register this PC to record attendance.';
-      document.getElementById('att-today-note').textContent='';
-    } else {
-      // PC registered — verify IP in background, show "Verifying..." state
-      banner.style.cssText='display:block;background:#f0f9ff;border:1px solid #bae6fd;border-radius:12px;padding:14px 18px;margin-bottom:18px;font-size:13px;color:#0369a1;';
-      banner.innerHTML=`<strong>🔄 Verifying your PC...</strong> Checking IP address — Login button will appear shortly.`;
-
-      getDeviceIp().then(currentIp=>{
-        if(!currentIp){
-          // IP fetch failed — still allow attendance (network issue, not fraud)
-          banner.style.cssText='display:block;background:#fef9c3;border:1px solid #fde047;border-radius:12px;padding:12px 18px;margin-bottom:18px;font-size:13px;color:#713f12;';
-          banner.innerHTML=`<strong>⚠️ Could not verify IP</strong> — Network issue. You may still mark attendance.<br><small>Registered PC IP: <code>${registeredIp}</code></small>`;
-          _showTodayCard(); // show buttons anyway
-          return;
-        }
-        if(currentIp===registeredIp){
-          // ✅ IP matches — green banner + show Login/Logout
-          banner.style.cssText='display:block;background:#f0fdf4;border:1.5px solid #34d399;border-radius:12px;padding:11px 18px;margin-bottom:18px;font-size:13px;color:#065f46;';
-          banner.innerHTML=`✅ <strong>Registered PC</strong> — IP: <code style="background:#d1fae5;padding:1px 6px;border-radius:4px;">${currentIp}</code> &nbsp;·&nbsp; ${getDeviceName()}
-            <button onclick="registerDevice()" style="margin-left:12px;background:transparent;color:#059669;border:1px solid #34d399;padding:3px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;">🔄 Re-register</button>`;
-          _showTodayCard(); // ✅ show Login/Logout buttons
-        } else {
-          // ⛔ IP mismatch — block attendance
-          banner.style.cssText='display:block;background:#fff1f2;border:1.5px solid #fca5a5;border-radius:12px;padding:14px 18px;margin-bottom:18px;font-size:13px;';
-          const hasPending = (db.pcChangeRequests||[]).find(r=>String(r.empId)===String(CU.empId)&&r.status==='pending');
-          banner.innerHTML=`<strong>⛔ Unregistered PC</strong> — Attendance can only be marked from your registered PC.<br>
-            <div style="margin-top:8px;font-size:12px;color:#7f1d1d;">
-              Registered IP: <code style="background:#fee2e2;padding:1px 6px;border-radius:4px;">${registeredIp}</code><br>
-              Your current IP: <code style="background:#fee2e2;padding:1px 6px;border-radius:4px;">${currentIp}</code>
-            </div>
-            ${hasPending
-              ? `<div style="margin-top:10px;background:#fef9c3;border:1px solid #fde047;border-radius:8px;padding:8px 12px;font-size:12px;color:#713f12;">⏳ <strong>PC change request pending</strong> — Waiting for manager approval.</div>`
-              : `<button onclick="requestPcChange('${currentIp}')" style="margin-top:10px;background:#2563eb;color:#fff;border:none;padding:7px 16px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;font-family:'Poppins',sans-serif;">📩 Request PC Change</button>
-                 <div style="margin-top:6px;font-size:11px;color:#991b1b;">Your manager will be notified to approve your new PC.</div>`
-            }`;
-          // Keep buttons hidden, update status
-          const _stEl2=document.getElementById('att-punch-status');
-          if(_stEl2) _stEl2.innerHTML='<span style="color:var(--red);font-weight:600;">⛔ PC not authorised</span>';
-          const _ntEl2=document.getElementById('att-today-note');
-          if(_ntEl2) _ntEl2.textContent='Please use your registered PC or request a PC change.';
-        }
-      }).catch(()=>{
-        // Any error — allow attendance rather than block
-        banner.style.cssText='display:block;background:#fef9c3;border:1px solid #fde047;border-radius:12px;padding:12px 18px;margin-bottom:18px;font-size:13px;color:#713f12;';
-        banner.innerHTML=`<strong>⚠️ IP verification error</strong> — You may still mark attendance.`;
-        _showTodayCard();
-      });
-    }
+    document.getElementById('att-today-panel').style.display='none';
+    document.getElementById('att-stats').style.display='grid';
+    const tbl = document.querySelector('#page-attendance table')?.closest('div');
+    if(tbl) tbl.style.display='block';
   }
 
-  // Filter records
-  let records = db.attendance.filter(r=>r.date.startsWith(selMonth));
-  if(isMgr){
-    const myEmpIds = db.employees.filter(e=>(e.managerIds||[e.managerId]).includes(CU.id)).map(e=>e.id);
-    records = records.filter(r=>myEmpIds.includes(r.empId)||myEmpIds.includes(Number(r.empId)));
-    const empSel = empFilterEl.value;
-    if(empSel!=='all') records = records.filter(r=>String(r.empId)===String(empSel));
-    // Source filter
-    const srcSel = document.getElementById('att-source-filter')?.value||'all';
-    if(srcSel!=='all') records = records.filter(r=>(r.source||'pc')===srcSel);
-  } else {
-    records = records.filter(r=>r.empId==CU.empId);
-  }
+  // Records table for manager
+  let records = (db.attendance||[]).filter(r=>r.date.startsWith(selMonth));
+  const myEmpIds = myEmps.map(e=>e.id);
+  records = records.filter(r=>myEmpIds.includes(r.empId)||myEmpIds.includes(Number(r.empId)));
 
-  // Stats — only render aggregate stats here if NOT filtering to a specific employee
+  const empSel = empFilterEl.value;
+  if(empSel!=='all') records = records.filter(r=>String(r.empId)===String(empSel));
+
+  const srcSel = document.getElementById('att-source-filter')?.value||'all';
+  if(srcSel!=='all') records = records.filter(r=>(r.source||'pc')===srcSel);
+
+  // Stats
   const [yr,mo] = selMonth.split('-').map(Number);
   const daysInMonth = new Date(yr,mo,0).getDate();
   const today = new Date();
   const daysElapsed = (yr===today.getFullYear()&&mo===today.getMonth()+1)?today.getDate():daysInMonth;
+  const workdays = countWorkdays(yr,mo,daysElapsed,CU.id);
 
-  const empSelForStats = isMgr ? empFilterEl.value : null;
-  if(!isMgr || empSelForStats === 'all'){
-    // Aggregate stats (all employees or employee's own view)
-    const workdays = countWorkdays(yr,mo,daysElapsed,CU.id);
-    const present = isMgr
-      ? [...new Set(records.map(r=>r.empId+'|'+r.date))].length
-      : records.filter(r=>r.checkIn).length;
-    const durations = records.filter(r=>r.checkIn&&r.checkOut).map(r=>{
-      const d=calcDuration(r.checkIn,r.checkOut); if(d==='—') return 0;
-      const m=d.match(/(\d+)h\s+(\d+)m/); return m ? parseInt(m[1])*60+parseInt(m[2]) : 0;
-    }).filter(x=>x>0);
-    const avgMins = durations.length ? Math.round(durations.reduce((a,b)=>a+b,0)/durations.length) : 0;
-    const avgDur = avgMins ? Math.floor(avgMins/60)+'h '+( avgMins%60)+'m' : '—';
+  if(empSel==='all'){
+    const present = [...new Set(records.map(r=>r.empId+'|'+r.date))].length;
     document.getElementById('att-stats').innerHTML=`
       <div class="sc s3"><div class="sl">Present Days</div><div class="sv c3" style="font-size:28px;font-weight:800;">${present}</div></div>
-      <div class="sc s1"><div class="sl">${isMgr?'Employees Tracked':'Absent Days'}</div><div class="sv c1" style="font-size:28px;font-weight:800;">${isMgr?[...new Set(records.map(r=>r.empId))].length:Math.max(0,workdays-present)}</div></div>
+      <div class="sc s1"><div class="sl">Employees Tracked</div><div class="sv c1" style="font-size:28px;font-weight:800;">${[...new Set(records.map(r=>r.empId))].length}</div></div>
       <div class="sc s2"><div class="sl">Working Days</div><div class="sv c2" style="font-size:28px;font-weight:800;">${workdays}</div></div>
-      <div class="sc s4"><div class="sl">${isMgr?'Month':'Avg Duration'}</div><div class="sv c4" style="font-size:${isMgr?'16':'22'}px;font-weight:800;">${isMgr?new Date(yr,mo-1).toLocaleString([],{month:'long',year:'numeric'}):avgDur}</div></div>
-    `;
+      <div class="sc s4"><div class="sl">Month</div><div class="sv c4" style="font-size:16px;font-weight:800;">${new Date(yr,mo-1).toLocaleString([],{month:'long',year:'numeric'})}</div></div>`;
+    if(empThEl) empThEl.style.display='';
+    _renderMgrRecordsTable(records, selMonth, daysInMonth, today);
+  } else {
+    // Per-employee calendar view
+    const selEmp = myEmps.find(e=>String(e.id)===String(empSel));
+    const empMgrForPolicy = selEmp ? (selEmp.managerIds?.[0]||selEmp.managerId||CU.id) : CU.id;
+    const empDurs = records.filter(r=>r.checkIn&&r.checkOut).map(r=>{
+      const d=calcDuration(r.checkIn,r.checkOut); if(d==='—') return 0;
+      const m=d.match(/(\d+)h\s+(\d+)m/); return m?parseInt(m[1])*60+parseInt(m[2]):0;
+    }).filter(x=>x>0);
+    const empAvgMins = empDurs.length?Math.round(empDurs.reduce((a,b)=>a+b,0)/empDurs.length):0;
+    const empAvgDur  = empAvgMins?Math.floor(empAvgMins/60)+'h '+(empAvgMins%60)+'m':'—';
+    const empWorkdays = countWorkdays(yr,mo,daysElapsed,empMgrForPolicy);
+    document.getElementById('att-stats').innerHTML=`
+      <div class="sc" style="grid-column:1/-1;background:linear-gradient(135deg,#e8eeff,#f0f4ff);border:1.5px solid #c7d2fe;border-radius:14px;padding:12px 16px;display:flex;align-items:center;gap:12px;">
+        <div class="av e" style="width:36px;height:36px;font-size:15px;flex-shrink:0;">${(selEmp?.name||'?')[0].toUpperCase()}</div>
+        <div><div style="font-weight:800;font-size:14px;">${selEmp?.name||'Employee'}</div><div style="font-size:11px;color:var(--muted);">${selEmp?.role||''} · ${new Date(yr,mo-1).toLocaleString([],{month:'long',year:'numeric'})}</div></div>
+      </div>
+      <div class="sc s3"><div class="sl">Present Days</div><div class="sv c3" style="font-size:28px;font-weight:800;">${records.filter(r=>r.checkIn).length}</div></div>
+      <div class="sc s1"><div class="sl">Absent Days</div><div class="sv c1" style="font-size:28px;font-weight:800;">${Math.max(0,empWorkdays-records.filter(r=>r.checkIn).length)}</div></div>
+      <div class="sc s2"><div class="sl">Working Days</div><div class="sv c2" style="font-size:28px;font-weight:800;">${empWorkdays}</div></div>
+      <div class="sc s4"><div class="sl">Avg Duration</div><div class="sv c4" style="font-size:22px;font-weight:800;">${empAvgDur}</div></div>`;
+    if(empThEl) empThEl.style.display='none';
+    _renderEmpCalendar(records, selMonth, daysInMonth, today, selEmp, empMgrForPolicy, true);
   }
+}
 
-  // Table
+function _renderMgrRecordsTable(records, selMonth, daysInMonth, today){
   const body  = document.getElementById('att-body');
   const empty = document.getElementById('att-empty');
+  if(!records.length){ body.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display='none';
+  body.innerHTML = records.sort((a,b)=>b.date.localeCompare(a.date)).map(r=>{
+    const emp = db.employees.find(e=>String(e.id)===String(r.empId));
+    const dur = calcDuration(r.checkIn,r.checkOut);
+    const dt  = new Date(r.date+'T12:00:00');
+    const dayName = dt.toLocaleDateString([],{weekday:'short'});
+    let statusHtml;
+    if(r.checkIn&&r.checkOut)    statusHtml='<span class="att-present">Complete</span>';
+    else if(r.checkIn)           statusHtml='<span style="background:#fef3c7;color:#d97706;font-weight:700;font-size:11px;padding:3px 10px;border-radius:20px;">In Office</span>';
+    else                         statusHtml='<span class="att-absent">Absent</span>';
+    return `<tr class="att-row">
+      <td><strong>${r.date}</strong></td>
+      <td style="font-weight:600;">${emp?.name||r.empName||'—'}</td>
+      <td style="color:var(--muted);">${dayName}</td>
+      <td style="font-weight:700;color:var(--green);">${r.checkIn||'—'}</td>
+      <td style="font-weight:700;color:var(--red);">${r.checkOut||'—'}</td>
+      <td style="font-weight:600;color:var(--blue);">${dur}</td>
+      <td>${sourceBadge(r.source||'pc',r.lat,r.lng)}</td>
+      <td>${statusHtml}</td>
+    </tr>`;
+  }).join('');
+}
 
-  if(isMgr){
-    const empSel = empFilterEl.value;
-    if(empSel !== 'all'){
-      // ── EMPLOYEE-SPECIFIC CALENDAR VIEW (same as employee's own view) ──
-      const selEmp = db.employees.find(e=>String(e.id)===String(empSel));
-      const empMgrForPolicy = selEmp ? (selEmp.managerIds?.[0]||selEmp.managerId||CU.id) : CU.id;
-      const rows = [];
-      for(let day=1;day<=daysInMonth;day++){
-        const dateStr = `${selMonth}-${String(day).padStart(2,'0')}`;
-        const dt = new Date(dateStr+'T12:00:00');
-        const dayName = dt.toLocaleDateString([],{weekday:'short'});
-        const rec = records.find(r=>r.date===dateStr);
-        const isFuture = dt > today && dateStr !== todayStr();
-        const dateStatus = getDateStatus(dateStr, empMgrForPolicy);
-        // Check if on leave that day
-        const onLeave = (db.leaves||[]).find(l=>
-          String(l.empId)===String(empSel) && l.status==='approved' &&
-          l.from<=dateStr && l.to>=dateStr
-        );
-        let statusHtml, ciTxt='—', coTxt='—', durTxt='—';
-        if(rec){ ciTxt=rec.checkIn||'—'; coTxt=rec.checkOut||'—'; durTxt=calcDuration(rec.checkIn,rec.checkOut); }
-        if(isFuture)                            statusHtml='<span style="color:var(--muted);font-size:12px;">—</span>';
-        else if(dateStatus?.type==='holiday')   statusHtml=`<span class="att-holiday">🎉 ${dateStatus.label}</span>`;
-        else if(dateStatus?.type==='weekend')   statusHtml=`<span class="att-holiday">${dateStatus.label}</span>`;
-        else if(dateStatus?.type==='halfday')   statusHtml='<span class="att-holiday">½ Saturday</span>';
-        else if(onLeave && rec?.checkIn)        statusHtml='<span style="background:#fef3c7;color:#d97706;font-weight:700;font-size:11px;padding:3px 10px;border-radius:20px;">⚠ On Leave+In</span>';
-        else if(onLeave)                        {const cfg=LEAVE_CONFIG[onLeave.type]||LEAVE_CONFIG.other; statusHtml=`<span style="background:${cfg.color}22;color:${cfg.color};font-weight:700;font-size:11px;padding:3px 10px;border-radius:20px;">${cfg.icon} On Leave</span>`;}
-        else if(rec?.checkIn&&rec?.checkOut)    statusHtml='<span class="att-present">Complete</span>';
-        else if(rec?.checkIn)                   statusHtml='<span style="background:#fef3c7;color:#d97706;font-weight:700;font-size:11px;padding:3px 10px;border-radius:20px;">In Office</span>';
-        else                                    statusHtml='<span class="att-absent">Absent</span>';
-        rows.push(`<tr class="att-row">
-          <td><strong>${dateStr}</strong></td>
-          <td style="color:var(--muted);">${dayName}</td>
-          <td style="font-weight:700;color:var(--green);">${ciTxt}</td>
-          <td style="font-weight:700;color:var(--red);">${coTxt}</td>
-          <td style="font-weight:600;color:var(--blue);">${durTxt}</td>
-          <td>${rec ? sourceBadge(rec.source||'pc', rec.lat, rec.lng) : '<span style="color:var(--muted);font-size:11px;">—</span>'}</td>
-          <td>${statusHtml}</td>
-        </tr>`);
-      }
-      // Stats for selected employee
-      const empWorkdays = countWorkdays(yr,mo,daysElapsed,empMgrForPolicy);
-      const empPresent  = records.filter(r=>r.checkIn).length;
-      const empLeaveDays = (db.leaves||[]).filter(l=>
-        String(l.empId)===String(empSel) && l.status==='approved' &&
-        l.from.startsWith(selMonth) || l.to.startsWith(selMonth)
-      ).reduce((sum,l)=>sum+(l.days||0),0);
-      const empDurs = records.filter(r=>r.checkIn&&r.checkOut).map(r=>{
-        const d=calcDuration(r.checkIn,r.checkOut); if(d==='—') return 0;
-        const m=d.match(/(\d+)h\s+(\d+)m/); return m ? parseInt(m[1])*60+parseInt(m[2]) : 0;
-      }).filter(x=>x>0);
-      const empAvgMins = empDurs.length ? Math.round(empDurs.reduce((a,b)=>a+b,0)/empDurs.length) : 0;
-      const empAvgDur  = empAvgMins ? Math.floor(empAvgMins/60)+'h '+(empAvgMins%60)+'m' : '—';
-      document.getElementById('att-stats').innerHTML=`
-        <div class="sc" style="grid-column:1/-1;background:linear-gradient(135deg,#e8eeff,#f0f4ff);border:1.5px solid #c7d2fe;border-radius:14px;padding:12px 16px;display:flex;align-items:center;gap:12px;">
-          <div class="av e" style="width:36px;height:36px;font-size:15px;flex-shrink:0;">${(selEmp?.name||'?')[0].toUpperCase()}</div>
-          <div><div style="font-weight:800;font-size:14px;">${selEmp?.name||'Employee'}</div><div style="font-size:11px;color:var(--muted);">${selEmp?.role||''} · ${new Date(yr,mo-1).toLocaleString([],{month:'long',year:'numeric'})}</div></div>
-        </div>
-        <div class="sc s3"><div class="sl">Present Days</div><div class="sv c3" style="font-size:28px;font-weight:800;">${empPresent}</div></div>
-        <div class="sc s1"><div class="sl">Absent Days</div><div class="sv c1" style="font-size:28px;font-weight:800;">${Math.max(0,empWorkdays-empPresent)}</div></div>
-        <div class="sc s2"><div class="sl">Working Days</div><div class="sv c2" style="font-size:28px;font-weight:800;">${empWorkdays}</div></div>
-        <div class="sc s4"><div class="sl">Avg Duration</div><div class="sv c4" style="font-size:22px;font-weight:800;">${empAvgDur}</div></div>
-      `;
-      // Swap employee column header for calendar view
-      if(empThEl) empThEl.style.display='none';
-      empty.style.display='none';
-      body.innerHTML = rows.reverse().join('');
-    } else {
-      // ── AGGREGATE VIEW for all employees ──
-      if(empThEl) empThEl.style.display='';
-      const sorted = [...records].sort((a,b)=>(b.checkInTs||b.date).localeCompare(a.checkInTs||a.date));
-      if(!sorted.length){ body.innerHTML=''; empty.style.display='block'; return; }
-      empty.style.display='none';
-      body.innerHTML = sorted.map(r=>{
-        const dur = calcDuration(r.checkIn, r.checkOut);
-        const dateStatus = getDateStatus(r.date, CU.id);
-        let statusHtml;
-        if(dateStatus?.type==='holiday')        statusHtml=`<span class="att-holiday">🎉 ${dateStatus.label}</span>`;
-        else if(r.checkIn&&r.checkOut)          statusHtml='<span class="att-present">Complete</span>';
-        else if(r.checkIn)                      statusHtml='<span style="background:#fef3c7;color:#d97706;font-weight:700;font-size:11px;padding:3px 10px;border-radius:20px;">In Office</span>';
-        else                                    statusHtml='<span class="att-absent">Absent</span>';
-        return `<tr class="att-row">
-          <td><strong>${r.date}</strong></td>
-          <td style="font-weight:600;">${r.empName||'—'}</td>
-          <td style="color:var(--muted);">${new Date(r.date+'T12:00:00').toLocaleDateString([],{weekday:'short'})}</td>
-          <td style="font-weight:700;color:var(--green);">${r.checkIn||'—'}</td>
-          <td style="font-weight:700;color:var(--red);">${r.checkOut||'—'}</td>
-          <td style="font-weight:600;color:var(--blue);">${dur}</td>
-          <td>${sourceBadge(r.source||'pc', r.lat, r.lng)}</td>
-          <td>${statusHtml}</td>
-        </tr>`;
-      }).join('');
-    }
+// ══════════════════════════════════════════════
+// EMPLOYEE ATTENDANCE VIEW
+// ══════════════════════════════════════════════
+function _renderAttendanceEmp(){
+  const selMonth = document.getElementById('att-month-filter').value;
+
+  // Hide manager-only elements
+  document.getElementById('att-emp-filter').style.display='none';
+  document.getElementById('att-source-filter').style.display='none';
+  document.getElementById('att-tabs').style.display='none';
+  document.getElementById('att-today-panel').style.display='none';
+  document.getElementById('att-stats').style.display='grid';
+  const tbl = document.querySelector('#page-attendance table')?.closest('div');
+  if(tbl) tbl.style.display='block';
+  const empThEl = document.getElementById('att-th-emp');
+  if(empThEl) empThEl.style.display='none';
+
+  // GPS banner
+  _renderGpsBanner();
+
+  // ── Today card — always show immediately ──
+  _showTodayCard(true); // show card, hide buttons until PC verified
+
+  // ── Device / IP banner ──
+  const banner = document.getElementById('att-device-banner');
+  const registeredIp = getRegisteredIp(CU.empId);
+  const mobile = isMobileDevice();
+
+  if(mobile){
+    banner.style.display='none';
+    _showTodayCard(); // mobile: show buttons directly, GPS will verify on tap
+  } else if(!registeredIp){
+    banner.style.cssText='display:block;background:#eff6ff;border:1.5px solid #93c5fd;border-radius:12px;padding:14px 18px;margin-bottom:18px;font-size:13px;';
+    banner.innerHTML=`<strong>🖥️ Register This PC</strong> — Register your PC's IP address to enable attendance marking.<br><br>
+      <button onclick="registerDevice()" style="background:var(--blue);color:#fff;border:none;padding:9px 22px;border-radius:9px;cursor:pointer;font-weight:700;font-size:13px;font-family:'Poppins',sans-serif;">✅ Register This PC</button>`;
+    document.getElementById('att-punch-status').innerHTML='<span style="color:var(--muted);">Register your PC to mark attendance.</span>';
+    document.getElementById('att-today-note').textContent='';
   } else {
-    // Employee: show every calendar day
-    const rows = [];
-    for(let day=1;day<=daysInMonth;day++){
-      const dateStr = `${selMonth}-${String(day).padStart(2,'0')}`;
-      const dt = new Date(dateStr+'T12:00:00');
-      const dayName = dt.toLocaleDateString([],{weekday:'short'});
-      const isWeekend = dt.getDay()===0||dt.getDay()===6;
-      const rec = records.find(r=>r.date===dateStr);
-      const isFuture = dt > today && dateStr !== todayStr();
-      // Get date status from manager's work policy
-      const empMgrId = CU.managerId||(CU.managerIds?CU.managerIds[0]:null)||'';
-      const dateStatus = getDateStatus(dateStr, empMgrId);
-      let statusHtml, ciTxt='—', coTxt='—', durTxt='—';
-      if(rec){ ciTxt=rec.checkIn||'—'; coTxt=rec.checkOut||'—'; durTxt=calcDuration(rec.checkIn,rec.checkOut); }
-      if(isFuture)                            statusHtml='<span style="color:var(--muted);font-size:12px;">—</span>';
-      else if(dateStatus?.type==='holiday')   statusHtml=`<span class="att-holiday">🎉 ${dateStatus.label}</span>`;
-      else if(dateStatus?.type==='weekend')   statusHtml=`<span class="att-holiday">${dateStatus.label}</span>`;
-      else if(dateStatus?.type==='halfday')   statusHtml='<span class="att-holiday">½ Saturday</span>';
-      else if(rec?.checkIn&&rec?.checkOut)    statusHtml='<span class="att-present">Complete</span>';
-      else if(rec?.checkIn)                   statusHtml='<span style="background:#fef3c7;color:#d97706;font-weight:700;font-size:11px;padding:3px 10px;border-radius:20px;">In Office</span>';
-      else                                    statusHtml='<span class="att-absent">Absent</span>';
-      rows.push(`<tr class="att-row">
-        <td><strong>${dateStr}</strong></td>
-        <td style="color:var(--muted);">${dayName}</td>
-        <td style="font-weight:700;color:var(--green);">${ciTxt}</td>
-        <td style="font-weight:700;color:var(--red);">${coTxt}</td>
-        <td style="font-weight:600;color:var(--blue);">${durTxt}</td>
-        <td>${rec ? sourceBadge(rec.source||'pc', rec.lat, rec.lng) : '<span style="color:var(--muted);font-size:11px;">—</span>'}</td>
-        <td>${statusHtml}</td>
-      </tr>`);
-    }
-    empty.style.display='none';
-    body.innerHTML = rows.reverse().join('');
+    // PC registered — verify IP in background
+    banner.style.cssText='display:block;background:#f0f9ff;border:1px solid #bae6fd;border-radius:12px;padding:12px 18px;margin-bottom:18px;font-size:13px;color:#0369a1;';
+    banner.innerHTML=`🔄 <strong>Verifying PC...</strong> &nbsp;<span style="font-size:12px;">Login button will appear in a moment.</span>`;
+
+    getDeviceIp().then(currentIp=>{
+      if(!currentIp || currentIp===registeredIp){
+        // Match (or can't verify — give benefit of doubt)
+        if(currentIp===registeredIp){
+          banner.style.cssText='display:block;background:#f0fdf4;border:1.5px solid #34d399;border-radius:12px;padding:11px 18px;margin-bottom:18px;font-size:13px;color:#065f46;';
+          banner.innerHTML=`✅ <strong>Registered PC</strong> — IP: <code style="background:#d1fae5;padding:1px 6px;border-radius:4px;">${currentIp}</code> &nbsp;·&nbsp; ${getDeviceName()}
+            <button onclick="registerDevice()" style="margin-left:12px;background:transparent;color:#059669;border:1px solid #34d399;padding:3px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;">🔄 Re-register</button>`;
+        } else {
+          banner.style.cssText='display:block;background:#fef9c3;border:1px solid #fde047;border-radius:12px;padding:11px 18px;margin-bottom:18px;font-size:13px;color:#713f12;';
+          banner.innerHTML=`⚠️ <strong>Could not verify PC IP</strong> — Attendance allowed. Registered IP: <code style="background:#fef08a;padding:1px 5px;border-radius:4px;">${registeredIp}</code>`;
+        }
+        _showTodayCard(); // ✅ show Login/Logout buttons
+      } else {
+        // IP mismatch — block
+        banner.style.cssText='display:block;background:#fff1f2;border:1.5px solid #fca5a5;border-radius:12px;padding:14px 18px;margin-bottom:18px;font-size:13px;';
+        const hasPending = (db.pcChangeRequests||[]).find(r=>String(r.empId)===String(CU.empId)&&r.status==='pending');
+        banner.innerHTML=`<strong>⛔ Wrong PC</strong> — You must mark attendance from your registered PC.<br>
+          <div style="margin-top:8px;font-size:12px;color:#7f1d1d;">Registered: <code style="background:#fee2e2;padding:1px 5px;border-radius:4px;">${registeredIp}</code> &nbsp; Current: <code style="background:#fee2e2;padding:1px 5px;border-radius:4px;">${currentIp}</code></div>
+          ${hasPending
+            ? `<div style="margin-top:10px;background:#fef9c3;border:1px solid #fde047;border-radius:8px;padding:8px 12px;font-size:12px;color:#713f12;">⏳ <strong>PC change request pending</strong> — Waiting for manager approval.</div>`
+            : `<button onclick="requestPcChange('${currentIp}')" style="margin-top:10px;background:#2563eb;color:#fff;border:none;padding:7px 16px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;font-family:'Poppins',sans-serif;">📩 Request PC Change</button>`
+          }`;
+        document.getElementById('att-punch-status').innerHTML='<span style="color:var(--red);font-weight:600;">⛔ PC not authorised</span>';
+        document.getElementById('att-today-note').textContent='Use your registered PC or request a PC change.';
+      }
+    }).catch(()=>{
+      banner.style.cssText='display:block;background:#fef9c3;border:1px solid #fde047;border-radius:12px;padding:11px 18px;margin-bottom:18px;font-size:13px;color:#713f12;';
+      banner.innerHTML=`⚠️ <strong>IP check error</strong> — Attendance allowed.`;
+      _showTodayCard();
+    });
   }
+
+  // ── Monthly records table for employee ──
+  let records = (db.attendance||[]).filter(r=>r.date.startsWith(selMonth) && r.empId==CU.empId);
+  const [yr,mo] = selMonth.split('-').map(Number);
+  const daysInMonth = new Date(yr,mo,0).getDate();
+  const today = new Date();
+  const daysElapsed = (yr===today.getFullYear()&&mo===today.getMonth()+1)?today.getDate():daysInMonth;
+  const empMgrId = CU.managerId||(CU.managerIds?CU.managerIds[0]:null)||'';
+  const workdays = countWorkdays(yr,mo,daysElapsed,empMgrId);
+  const present  = records.filter(r=>r.checkIn).length;
+  const durations = records.filter(r=>r.checkIn&&r.checkOut).map(r=>{
+    const d=calcDuration(r.checkIn,r.checkOut); if(d==='—') return 0;
+    const m=d.match(/(\d+)h\s+(\d+)m/); return m?parseInt(m[1])*60+parseInt(m[2]):0;
+  }).filter(x=>x>0);
+  const avgMins = durations.length?Math.round(durations.reduce((a,b)=>a+b,0)/durations.length):0;
+  const avgDur  = avgMins?Math.floor(avgMins/60)+'h '+(avgMins%60)+'m':'—';
+  document.getElementById('att-stats').innerHTML=`
+    <div class="sc s3"><div class="sl">Present Days</div><div class="sv c3" style="font-size:28px;font-weight:800;">${present}</div></div>
+    <div class="sc s1"><div class="sl">Absent Days</div><div class="sv c1" style="font-size:28px;font-weight:800;">${Math.max(0,workdays-present)}</div></div>
+    <div class="sc s2"><div class="sl">Working Days</div><div class="sv c2" style="font-size:28px;font-weight:800;">${workdays}</div></div>
+    <div class="sc s4"><div class="sl">Avg Duration</div><div class="sv c4" style="font-size:22px;font-weight:800;">${avgDur}</div></div>`;
+
+  _renderEmpCalendar(records, selMonth, daysInMonth, today, null, empMgrId, false);
+}
+
+function _renderEmpCalendar(records, selMonth, daysInMonth, today, selEmp, empMgrForPolicy, isMgrView){
+  const body  = document.getElementById('att-body');
+  const empty = document.getElementById('att-empty');
+  const empId = isMgrView ? (selEmp?.id) : CU.empId;
+  const rows  = [];
+  for(let day=1;day<=daysInMonth;day++){
+    const dateStr = `${selMonth}-${String(day).padStart(2,'0')}`;
+    const dt = new Date(dateStr+'T12:00:00');
+    const dayName = dt.toLocaleDateString([],{weekday:'short'});
+    const rec = records.find(r=>r.date===dateStr);
+    const isFuture = dt > today && dateStr !== todayStr();
+    const dateStatus = getDateStatus(dateStr, empMgrForPolicy);
+    const onLeave = (db.leaves||[]).find(l=>
+      String(l.empId)===String(empId) && l.status==='approved' &&
+      l.from<=dateStr && l.to>=dateStr
+    );
+    let statusHtml, ciTxt='—', coTxt='—', durTxt='—';
+    if(rec){ ciTxt=rec.checkIn||'—'; coTxt=rec.checkOut||'—'; durTxt=calcDuration(rec.checkIn,rec.checkOut); }
+    if(isFuture)                            statusHtml='<span style="color:var(--muted);font-size:12px;">—</span>';
+    else if(dateStatus?.type==='holiday')   statusHtml=`<span class="att-holiday">🎉 ${dateStatus.label}</span>`;
+    else if(dateStatus?.type==='weekend')   statusHtml=`<span class="att-holiday">${dateStatus.label}</span>`;
+    else if(dateStatus?.type==='halfday')   statusHtml='<span class="att-holiday">½ Saturday</span>';
+    else if(onLeave && rec?.checkIn)        statusHtml='<span style="background:#fef3c7;color:#d97706;font-weight:700;font-size:11px;padding:3px 10px;border-radius:20px;">⚠ On Leave+In</span>';
+    else if(onLeave){const cfg=LEAVE_CONFIG[onLeave.type]||LEAVE_CONFIG.other; statusHtml=`<span style="background:${cfg.color}22;color:${cfg.color};font-weight:700;font-size:11px;padding:3px 10px;border-radius:20px;">${cfg.icon} On Leave</span>`;}
+    else if(rec?.checkIn&&rec?.checkOut)    statusHtml='<span class="att-present">Complete</span>';
+    else if(rec?.checkIn)                   statusHtml='<span style="background:#fef3c7;color:#d97706;font-weight:700;font-size:11px;padding:3px 10px;border-radius:20px;">In Office</span>';
+    else                                    statusHtml='<span class="att-absent">Absent</span>';
+    rows.push(`<tr class="att-row">
+      <td><strong>${dateStr}</strong></td>
+      <td style="color:var(--muted);">${dayName}</td>
+      <td style="font-weight:700;color:var(--green);">${ciTxt}</td>
+      <td style="font-weight:700;color:var(--red);">${coTxt}</td>
+      <td style="font-weight:600;color:var(--blue);">${durTxt}</td>
+      <td>${rec ? sourceBadge(rec.source||'pc',rec.lat,rec.lng) : '<span style="color:var(--muted);font-size:11px;">—</span>'}</td>
+      <td>${statusHtml}</td>
+    </tr>`);
+  }
+  empty.style.display='none';
+  body.innerHTML = rows.reverse().join('');
 }
 function exportAttendance(){
   if(!CU) return;
