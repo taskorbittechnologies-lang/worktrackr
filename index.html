@@ -5817,6 +5817,12 @@ function checkIn(){
   const rec = getTodayRecord(CU.empId);
   if(rec && rec.checkIn){ toast('You have already logged in today at '+rec.checkIn,'warn'); return; }
 
+  // If IP verification is still in progress, wait and retry
+  if(!isMobileDevice() && _ipVerified === null){
+    toast('⏳ Still verifying your PC... please wait a moment and try again.','warn');
+    return;
+  }
+
   // Check if employee is on approved leave today
   const todayDate = todayStr();
   const activeLeave = (db.leaves||[]).find(l=>
@@ -5888,6 +5894,12 @@ function checkOut(){
   const rec = getTodayRecord(CU.empId);
   if(!rec||!rec.checkIn){ toast('Please login first','err'); return; }
   if(rec.checkOut){ toast('You have already logged out today at '+rec.checkOut,'warn'); return; }
+
+  // If IP verification is still in progress, wait
+  if(!isMobileDevice() && _ipVerified === null){
+    toast('⏳ Still verifying your PC... please wait a moment and try again.','warn');
+    return;
+  }
 
   const coBtn=document.getElementById('att-checkout-btn');
   if(coBtn){ coBtn.disabled=true; coBtn.textContent='📡 Checking location...'; }
@@ -6283,6 +6295,7 @@ function _renderMgrRecordsTable(records, selMonth, daysInMonth, today){
 // ══════════════════════════════════════════════
 function _renderAttendanceEmp(){
   const selMonth = document.getElementById('att-month-filter').value;
+  _ipVerified = null; // reset IP verification cache on every render
 
   // Hide manager-only elements
   document.getElementById('att-emp-filter').style.display='none';
@@ -6317,12 +6330,14 @@ function _renderAttendanceEmp(){
     document.getElementById('att-today-note').textContent='';
   } else {
     // PC registered — verify IP in background
+    _ipVerified = null; // reset cache while checking
     banner.style.cssText='display:block;background:#f0f9ff;border:1px solid #bae6fd;border-radius:12px;padding:12px 18px;margin-bottom:18px;font-size:13px;color:#0369a1;';
     banner.innerHTML=`🔄 <strong>Verifying PC...</strong> &nbsp;<span style="font-size:12px;">Login button will appear in a moment.</span>`;
 
     getDeviceIp().then(currentIp=>{
       if(!currentIp || currentIp===registeredIp){
         // Match (or can't verify — give benefit of doubt)
+        _ipVerified = true;
         if(currentIp===registeredIp){
           banner.style.cssText='display:block;background:#f0fdf4;border:1.5px solid #34d399;border-radius:12px;padding:11px 18px;margin-bottom:18px;font-size:13px;color:#065f46;';
           banner.innerHTML=`✅ <strong>Registered PC</strong> — IP: <code style="background:#d1fae5;padding:1px 6px;border-radius:4px;">${currentIp}</code> &nbsp;·&nbsp; ${getDeviceName()}
@@ -6334,6 +6349,7 @@ function _renderAttendanceEmp(){
         _showTodayCard(); // ✅ show Login/Logout buttons
       } else {
         // IP mismatch — block
+        _ipVerified = false;
         banner.style.cssText='display:block;background:#fff1f2;border:1.5px solid #fca5a5;border-radius:12px;padding:14px 18px;margin-bottom:18px;font-size:13px;';
         const hasPending = (db.pcChangeRequests||[]).find(r=>String(r.empId)===String(CU.empId)&&r.status==='pending');
         banner.innerHTML=`<strong>⛔ Wrong PC</strong> — You must mark attendance from your registered PC.<br>
@@ -6346,6 +6362,7 @@ function _renderAttendanceEmp(){
         document.getElementById('att-today-note').textContent='Use your registered PC or request a PC change.';
       }
     }).catch(()=>{
+      _ipVerified = true; // network error — allow through
       banner.style.cssText='display:block;background:#fef9c3;border:1px solid #fde047;border-radius:12px;padding:11px 18px;margin-bottom:18px;font-size:13px;color:#713f12;';
       banner.innerHTML=`⚠️ <strong>IP check error</strong> — Attendance allowed.`;
       _showTodayCard();
@@ -7909,37 +7926,47 @@ function saveGpsPolicy(){
 
 // ── GPS check for check-in / check-out ──
 // Returns a Promise: resolves with {ok:true, lat, lng, source} or rejects with error message
+// ── IP verification result cache — set by banner check, reused by checkIn/checkOut ──
+let _ipVerified = null; // true = verified match, false = mismatch, null = unknown
+
 function _gpsCheckLocation(empId){
   return new Promise((resolve, reject)=>{
     const cfg = getEmpGpsConfig(empId);
     const mobile = isMobileDevice();
 
-    // PC path — verify IP against registered IP
+    // PC path
     if(!mobile){
       const emp = db.employees.find(e=>e.id==empId);
       const gpsCfg = db.managers.find(m=>(emp?.managerIds||[emp?.managerId]).includes(m.id))?.gpsConfig||{};
-      if(gpsCfg.enabled&&gpsCfg.requireMobile&&!gpsCfg.allowPc){
+      if(gpsCfg.enabled && gpsCfg.requireMobile && !gpsCfg.allowPc){
         reject('🚫 Attendance on PC is disabled by your manager. Please use your mobile device with GPS.');
         return;
       }
       const regIp = getRegisteredIp(empId);
       if(!regIp){
-        reject('🖥️ This PC is not registered. Go to Attendance and register your PC first.');
+        reject('🖥️ This PC is not registered. Please go to Attendance and register your PC first.');
         return;
       }
-      getDeviceIp().then(currentIp=>{
-        if(!currentIp){
-          // Cannot fetch IP — allow attendance rather than block due to network issue
-          resolve({ok:true, lat:null, lng:null, source:'pc'});
-          return;
-        }
-        if(currentIp!==regIp){
-          reject(`⛔ Wrong PC detected.\n\nRegistered IP: ${regIp}\nYour current IP: ${currentIp}\n\nPlease mark attendance from your registered PC, or request a PC change from the Attendance page.`);
-          return;
-        }
+      // If banner already verified — use cached result instantly
+      if(_ipVerified === true){
         resolve({ok:true, lat:null, lng:null, source:'pc'});
+        return;
+      }
+      if(_ipVerified === false){
+        reject(`⛔ This PC is not authorised. Please use your registered PC or request a PC change from the Attendance page.`);
+        return;
+      }
+      // Not yet verified — fetch IP now
+      getDeviceIp().then(currentIp=>{
+        if(!currentIp || currentIp===regIp){
+          _ipVerified = true;
+          resolve({ok:true, lat:null, lng:null, source:'pc'});
+        } else {
+          _ipVerified = false;
+          reject(`⛔ Wrong PC — Registered IP: ${regIp}, Your IP: ${currentIp}.\n\nUse your registered PC or request a PC change from the Attendance page.`);
+        }
       }).catch(()=>{
-        // IP check error — allow rather than block
+        // Network error — allow through
         resolve({ok:true, lat:null, lng:null, source:'pc'});
       });
       return;
