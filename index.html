@@ -5952,9 +5952,12 @@ async function registerDevice(){
 // ── Helper: render the today card (date, times, login/logout buttons) ──
 // hideButtons=true: show card but keep Login/Logout hidden (used while IP is verifying)
 function _showTodayCard(hideButtons){
+  // Always show the today card container and stats
   const todayCard = document.getElementById('att-today-card');
-  if(!todayCard) return;
-  todayCard.style.display='block';
+  if(todayCard) todayCard.style.display='block';
+  const statsEl = document.getElementById('att-stats');
+  if(statsEl) statsEl.style.display='grid';
+
   const dateEl = document.getElementById('att-today-date');
   if(dateEl) dateEl.textContent = new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 
@@ -5972,10 +5975,10 @@ function _showTodayCard(hideButtons){
   if(durEl) durEl.textContent = rec ? calcDuration(rec.checkIn, rec.checkOut) : '—';
 
   if(hideButtons){
-    if(ciBtn) ciBtn.style.display='none';
-    if(coBtn) coBtn.style.display='none';
+    if(ciBtn){ ciBtn.style.display='none'; ciBtn.disabled=false; ciBtn.innerHTML='🟢 Login'; }
+    if(coBtn){ coBtn.style.display='none'; coBtn.disabled=false; coBtn.innerHTML='🔴 Logout'; }
     if(statusEl) statusEl.innerHTML='<span style="color:var(--muted);">🔄 Verifying PC...</span>';
-    if(noteEl) noteEl.textContent='';
+    if(noteEl) noteEl.textContent='Please wait while we verify your PC.';
   } else if(!rec || !rec.checkIn){
     if(ciBtn){ ciBtn.style.display='flex'; ciBtn.disabled=false; ciBtn.innerHTML='🟢 Login'; }
     if(coBtn) coBtn.style.display='none';
