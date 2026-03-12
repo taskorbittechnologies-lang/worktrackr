@@ -6191,53 +6191,46 @@ function renderAttendance(){
     // GPS banner
     _renderGpsBanner();
 
+    // Always show the today card immediately with current record data
+    _showTodayCard(true); // show card, hide buttons until PC verified
+
     // Device banner — IP-based PC lock
     const banner = document.getElementById('att-device-banner');
     const registeredIp = getRegisteredIp(CU.empId);
     const mobile = isMobileDevice();
 
     if(mobile){
-      // Mobile: device banner not shown — GPS handles it
+      // Mobile: no IP check needed — GPS handles auth
       banner.style.display='none';
+      _showTodayCard(); // show buttons for mobile
     } else if(!registeredIp){
-      // PC not registered yet
+      // PC not registered yet — show register button, keep Login/Logout hidden
       banner.style.display='block';
-      banner.innerHTML=`<strong>🖥️ Register This PC</strong> — Your PC's IP address must be registered before you can mark attendance from a computer.<br><br>
+      banner.innerHTML=`<strong>🖥️ Register This PC</strong> — Your PC's IP address must be registered before you can mark attendance.<br><br>
         <button onclick="registerDevice()" style="background:var(--blue);color:#fff;border:none;padding:8px 20px;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;font-family:'Poppins',sans-serif;">✅ Register This PC</button>`;
-      // Hide check-in buttons until registered
-      const _ciB=document.getElementById('att-checkin-btn');
-      const _coB=document.getElementById('att-checkout-btn');
-      if(_ciB) _ciB.style.display='none';
-      if(_coB) _coB.style.display='none';
-      const _stEl=document.getElementById('att-punch-status');
-      if(_stEl) _stEl.textContent='Register this PC to record attendance.';
-      const _ntEl=document.getElementById('att-today-note');
-      if(_ntEl) _ntEl.textContent='';
+      document.getElementById('att-punch-status').textContent='Register this PC to record attendance.';
+      document.getElementById('att-today-note').textContent='';
     } else {
-      // PC registered — verify IP async
-      banner.style.display='block';
+      // PC registered — verify IP in background, show "Verifying..." state
       banner.style.cssText='display:block;background:#f0f9ff;border:1px solid #bae6fd;border-radius:12px;padding:14px 18px;margin-bottom:18px;font-size:13px;color:#0369a1;';
-      banner.innerHTML=`<strong>🔄 Verifying your PC...</strong> Checking your IP address against registered PC.`;
-      const _ciB=document.getElementById('att-checkin-btn');
-      const _coB=document.getElementById('att-checkout-btn');
-      if(_ciB) _ciB.style.display='none';
-      if(_coB) _coB.style.display='none';
+      banner.innerHTML=`<strong>🔄 Verifying your PC...</strong> Checking IP address — Login button will appear shortly.`;
 
       getDeviceIp().then(currentIp=>{
         if(!currentIp){
-          banner.style.cssText='display:block;background:var(--orange-l);border:1px solid var(--orange);border-radius:12px;padding:14px 18px;margin-bottom:18px;font-size:13px;';
-          banner.innerHTML=`<strong>⚠️ IP Check Failed</strong> — Could not verify your PC's IP address. Check your internet connection.<br><small style="color:var(--muted);">Registered PC IP: ${registeredIp}</small>`;
+          // IP fetch failed — still allow attendance (network issue, not fraud)
+          banner.style.cssText='display:block;background:#fef9c3;border:1px solid #fde047;border-radius:12px;padding:12px 18px;margin-bottom:18px;font-size:13px;color:#713f12;';
+          banner.innerHTML=`<strong>⚠️ Could not verify IP</strong> — Network issue. You may still mark attendance.<br><small>Registered PC IP: <code>${registeredIp}</code></small>`;
+          _showTodayCard(); // show buttons anyway
           return;
         }
         if(currentIp===registeredIp){
-          // Match — show green badge and enable buttons
+          // ✅ IP matches — green banner + show Login/Logout
           banner.style.cssText='display:block;background:#f0fdf4;border:1.5px solid #34d399;border-radius:12px;padding:11px 18px;margin-bottom:18px;font-size:13px;color:#065f46;';
           banner.innerHTML=`✅ <strong>Registered PC</strong> — IP: <code style="background:#d1fae5;padding:1px 6px;border-radius:4px;">${currentIp}</code> &nbsp;·&nbsp; ${getDeviceName()}
             <button onclick="registerDevice()" style="margin-left:12px;background:transparent;color:#059669;border:1px solid #34d399;padding:3px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;">🔄 Re-register</button>`;
-          // Show today card and correct button states
-          _showTodayCard();
+          _showTodayCard(); // ✅ show Login/Logout buttons
         } else {
-          // IP mismatch — block + allow request
+          // ⛔ IP mismatch — block attendance
           banner.style.cssText='display:block;background:#fff1f2;border:1.5px solid #fca5a5;border-radius:12px;padding:14px 18px;margin-bottom:18px;font-size:13px;';
           const hasPending = (db.pcChangeRequests||[]).find(r=>String(r.empId)===String(CU.empId)&&r.status==='pending');
           banner.innerHTML=`<strong>⛔ Unregistered PC</strong> — Attendance can only be marked from your registered PC.<br>
@@ -6250,22 +6243,19 @@ function renderAttendance(){
               : `<button onclick="requestPcChange('${currentIp}')" style="margin-top:10px;background:#2563eb;color:#fff;border:none;padding:7px 16px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;font-family:'Poppins',sans-serif;">📩 Request PC Change</button>
                  <div style="margin-top:6px;font-size:11px;color:#991b1b;">Your manager will be notified to approve your new PC.</div>`
             }`;
-          const _ciB2=document.getElementById('att-checkin-btn');
-          const _coB2=document.getElementById('att-checkout-btn');
-          if(_ciB2) _ciB2.style.display='none';
-          if(_coB2) _coB2.style.display='none';
+          // Keep buttons hidden, update status
           const _stEl2=document.getElementById('att-punch-status');
           if(_stEl2) _stEl2.innerHTML='<span style="color:var(--red);font-weight:600;">⛔ PC not authorised</span>';
-          _showTodayCard(true); // show card but keep buttons hidden
+          const _ntEl2=document.getElementById('att-today-note');
+          if(_ntEl2) _ntEl2.textContent='Please use your registered PC or request a PC change.';
         }
+      }).catch(()=>{
+        // Any error — allow attendance rather than block
+        banner.style.cssText='display:block;background:#fef9c3;border:1px solid #fde047;border-radius:12px;padding:12px 18px;margin-bottom:18px;font-size:13px;color:#713f12;';
+        banner.innerHTML=`<strong>⚠️ IP verification error</strong> — You may still mark attendance.`;
+        _showTodayCard();
       });
-      // Show today card immediately (buttons will be set after IP resolves)
-      _showTodayCard(true);
-      return;
     }
-
-    // Today card display for mobile path (GPS handles auth)
-    _showTodayCard();
   }
 
   // Filter records
@@ -7948,7 +7938,6 @@ function _gpsCheckLocation(empId){
         reject('🚫 Attendance on PC is disabled by your manager. Please use your mobile device with GPS.');
         return;
       }
-      // IP check
       const regIp = getRegisteredIp(empId);
       if(!regIp){
         reject('🖥️ This PC is not registered. Go to Attendance and register your PC first.');
@@ -7956,15 +7945,19 @@ function _gpsCheckLocation(empId){
       }
       getDeviceIp().then(currentIp=>{
         if(!currentIp){
-          reject('⚠️ Could not verify your PC\'s IP address. Please check your internet connection.');
+          // Cannot fetch IP — allow attendance rather than block due to network issue
+          resolve({ok:true, lat:null, lng:null, source:'pc'});
           return;
         }
         if(currentIp!==regIp){
-          reject(`⛔ Unregistered PC — Your current IP (${currentIp}) does not match your registered PC (${regIp}).\n\nPlease mark attendance from your registered PC.`);
+          reject(`⛔ Wrong PC detected.\n\nRegistered IP: ${regIp}\nYour current IP: ${currentIp}\n\nPlease mark attendance from your registered PC, or request a PC change from the Attendance page.`);
           return;
         }
         resolve({ok:true, lat:null, lng:null, source:'pc'});
-      }).catch(()=>reject('⚠️ IP verification failed. Please check your internet connection.'));
+      }).catch(()=>{
+        // IP check error — allow rather than block
+        resolve({ok:true, lat:null, lng:null, source:'pc'});
+      });
       return;
     }
 
