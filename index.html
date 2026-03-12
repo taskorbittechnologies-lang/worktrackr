@@ -848,6 +848,9 @@ tr:hover td{background:var(--surface2);}
         </div>
       </div>
       <!-- Attendance sub-tab bar (manager only) -->
+      <!-- PC CHANGE REQUESTS (manager only) -->
+      <div id="att-pc-requests" style="display:none;background:var(--surface);border:1.5px solid var(--orange);border-radius:14px;padding:16px 18px;margin-bottom:18px;"></div>
+
       <div id="att-tabs" style="display:none;gap:4px;flex-wrap:wrap;background:var(--surface2);border-radius:12px;padding:5px;margin-bottom:18px;">
         <button id="atab-today"   class="stab stab-on" onclick="switchAttTab('today')">&#128197; Today's Attendance</button>
         <button id="atab-records" class="stab"         onclick="switchAttTab('records')">&#128202; Monthly Records</button>
@@ -1857,7 +1860,7 @@ const SWATCHES = ['#c0472b','#2a7c58','#2563a8','#6b47b8','#c07a2a','#2a7c7c','#
 // ═══════════════════════════════════════════════════
 const STORAGE_KEY = 'worktrackr_db_v5';
 const GAS_KEY     = 'worktrackr_fb_url';  // reuse key name for compat
-const FIREBASE_URL = 'https://taskflow-13c2e-default-rtdb.firebaseio.com'; // hardcoded for universal access
+const FIREBASE_URL = ''; // Do NOT hardcode a URL — each deployment uses its own Firebase project
 
 let db         = null;
 let gasUrl     = null;  // holds Firebase DB URL
@@ -1865,7 +1868,7 @@ let _saveTimer = null;
 let _pollTimer = null;
 let _lastHash  = '';
 
-function getGasUrl(){ return localStorage.getItem(GAS_KEY)||FIREBASE_URL||null; }
+function getGasUrl(){ return localStorage.getItem(GAS_KEY)||null; }
 
 // ── Firebase REST helpers ──
 // Firebase Realtime DB exposes a REST API at:
@@ -1896,8 +1899,13 @@ async function fbRead(){
   var res = await fbFetch(fbEndpoint(), {method:'GET', headers:{'Accept':'application/json'}});
   if(!res.ok){
     var txt = await res.text();
-    if(res.status===401||res.status===403) throw new Error('Permission denied ('+res.status+'). Go to Firebase > Realtime Database > Rules tab > set .read and .write to true > click Publish.');
-    if(res.status===404) throw new Error('Database not found (404). Check your URL ends in .firebaseio.com');
+    if(res.status===401||res.status===403) throw new Error('Permission denied ('+res.status+'). Go to Firebase Console → Realtime Database → Rules → set .read and .write to true → click Publish.');
+    if(res.status===404){
+      // Database doesn't exist — clear the saved URL so user is prompted to set up a new one
+      localStorage.removeItem(GAS_KEY);
+      gasUrl = null;
+      throw new Error('Firebase database not found (404). The configured database URL does not exist or has been deleted.\n\nPlease set up a new Firebase Realtime Database and enter the correct URL.');
+    }
     throw new Error('Firebase error '+res.status+': '+txt.substring(0,200));
   }
   return res.json();
@@ -2015,13 +2023,33 @@ async function loadFromCloud(){
     startPolling();
 
   }catch(e){
-    // Firebase failed — fall back to localStorage silently
+    // Firebase failed — check if the URL was cleared (404 case)
     console.warn('[WorkTrackr] Firebase unavailable:',e.message);
+
+    // If URL was cleared by a 404, show the setup screen with explanation
+    if(!gasUrl){
+      hideLoading();
+      var fbSetup = document.getElementById('fb-setup');
+      if(fbSetup) fbSetup.style.display='block';
+      var errEl = document.getElementById('fb-setup-err');
+      if(errEl) showErr(errEl, '⚠️ Firebase database not found (404).\n\nThe previously saved database URL no longer exists or was deleted.\n\nPlease enter a new Firebase Realtime Database URL below to continue.');
+      // Still load local data so app works offline
+      if(localDb){
+        db = localDb;
+        onDataReady();
+      } else {
+        db = JSON.parse(JSON.stringify(DEFAULT_DB));
+        try{localStorage.setItem(STORAGE_KEY,JSON.stringify(db));}catch(ex){}
+        onDataReady();
+      }
+      return;
+    }
+
+    // Other Firebase error — fall back to localStorage silently
     if(localDb){
       db = localDb;
       hideLoading(); document.getElementById('fb-setup').style.display='none';
       onDataReady();
-      // Retry Firebase in background
       setTimeout(function(){ _retryFirebase(); }, 5000);
       return;
     }
@@ -5921,7 +5949,169 @@ async function registerDevice(){
   renderAttendance();
 }
 
-// ── checkAutoPunch — kept for backward compat but no-op now ──
+// ── Helper: render the today card (date, times, login/logout buttons) ──
+// hideButtons=true: show card but keep Login/Logout hidden (used while IP is verifying)
+function _showTodayCard(hideButtons){
+  const todayCard = document.getElementById('att-today-card');
+  if(!todayCard) return;
+  todayCard.style.display='block';
+  const dateEl = document.getElementById('att-today-date');
+  if(dateEl) dateEl.textContent = new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+
+  const rec = getTodayRecord(CU.empId);
+  const ciEl  = document.getElementById('att-ci-time');
+  const coEl  = document.getElementById('att-co-time');
+  const durEl = document.getElementById('att-duration');
+  const noteEl= document.getElementById('att-today-note');
+  const ciBtn = document.getElementById('att-checkin-btn');
+  const coBtn = document.getElementById('att-checkout-btn');
+  const statusEl = document.getElementById('att-punch-status');
+
+  if(ciEl) ciEl.textContent  = rec?.checkIn  || '—';
+  if(coEl) coEl.textContent  = rec?.checkOut || '—';
+  if(durEl) durEl.textContent = rec ? calcDuration(rec.checkIn, rec.checkOut) : '—';
+
+  if(hideButtons){
+    if(ciBtn) ciBtn.style.display='none';
+    if(coBtn) coBtn.style.display='none';
+    if(statusEl) statusEl.innerHTML='<span style="color:var(--muted);">🔄 Verifying PC...</span>';
+    if(noteEl) noteEl.textContent='';
+  } else if(!rec || !rec.checkIn){
+    if(ciBtn){ ciBtn.style.display='flex'; ciBtn.disabled=false; ciBtn.innerHTML='🟢 Login'; }
+    if(coBtn) coBtn.style.display='none';
+    if(statusEl) statusEl.innerHTML='<span style="color:var(--orange);font-weight:600;">⏳ Not checked in yet</span>';
+    if(noteEl) noteEl.textContent='Click Login when you start work.';
+  } else if(rec.checkIn && !rec.checkOut){
+    if(ciBtn) ciBtn.style.display='none';
+    if(coBtn){ coBtn.style.display='flex'; coBtn.disabled=false; coBtn.innerHTML='🔴 Logout'; }
+    if(statusEl) statusEl.innerHTML=`<span style="color:var(--green);font-weight:600;">🟢 Logged in at ${rec.checkIn}</span>`;
+    if(noteEl) noteEl.textContent='Click Logout before you leave.';
+  } else {
+    if(ciBtn) ciBtn.style.display='none';
+    if(coBtn) coBtn.style.display='none';
+    const dur = calcDuration(rec.checkIn, rec.checkOut);
+    if(statusEl) statusEl.innerHTML=`<span style="color:var(--blue);font-weight:600;">✅ Day complete — Total hours: ${dur}</span>`;
+    if(noteEl) noteEl.textContent='Have a great rest of your day!';
+  }
+  startLiveClock();
+}
+
+// ── Employee requests PC change (sent to manager for approval) ──
+function requestPcChange(newIp){
+  if(!CU||CU.role!=='employee') return;
+  const emp = db.employees.find(e=>e.id==CU.empId);
+  if(!emp) return;
+  const reason = prompt('📩 Request PC Change\n\nPlease briefly explain why you need to change your registered PC:\n(e.g. "My old PC broke, using a new machine")','');
+  if(reason===null) return; // cancelled
+  if(!reason.trim()){ toast('Please provide a reason for the PC change request.','err'); return; }
+
+  db.pcChangeRequests = db.pcChangeRequests||[];
+  // Remove any existing pending request for this employee
+  db.pcChangeRequests = db.pcChangeRequests.filter(r=>!(String(r.empId)===String(CU.empId)&&r.status==='pending'));
+
+  const req = {
+    id: Date.now(),
+    empId: CU.empId,
+    empName: CU.name,
+    oldIp: emp.registeredIp||'—',
+    newIp: newIp,
+    reason: reason.trim(),
+    requestedAt: new Date().toISOString(),
+    status: 'pending'
+  };
+  db.pcChangeRequests.push(req);
+
+  // Notify manager
+  const mgrIds = emp.managerIds||[emp.managerId||''];
+  mgrIds.forEach(mgrId=>{
+    if(mgrId) notify({
+      category:'attendance', icon:'🖥️',
+      title:'PC Change Request',
+      msg:`${CU.name} has requested to change their registered PC.\nNew IP: ${newIp}\nReason: ${reason.trim()}`,
+      for: mgrId
+    });
+  });
+
+  saveDB();
+  toast('✅ PC change request sent to your manager!','ok');
+  renderAttendance();
+}
+
+// ── Manager approves or rejects a PC change request ──
+function approvePcChange(reqId){
+  db.pcChangeRequests = db.pcChangeRequests||[];
+  const req = db.pcChangeRequests.find(r=>r.id===reqId);
+  if(!req) return;
+  const emp = db.employees.find(e=>e.id==req.empId);
+  if(!emp){ toast('Employee not found.','err'); return; }
+
+  if(!confirm(`Approve PC change for ${req.empName}?\n\nOld IP: ${req.oldIp}\nNew IP: ${req.newIp}\nReason: ${req.reason}\n\nThis will update their registered PC immediately.`)) return;
+
+  emp.registeredIp = req.newIp;
+  emp.deviceName   = 'PC (manager approved)';
+  emp.registeredAt = new Date().toISOString();
+  req.status = 'approved';
+  req.resolvedAt = new Date().toISOString();
+
+  // Notify employee
+  notify({category:'attendance', icon:'✅', title:'PC Change Approved',
+    msg:`Your request to change your registered PC has been approved. You can now mark attendance from IP: ${req.newIp}.`,
+    for: req.empId, isEmp: true});
+
+  saveDB();
+  renderEmployees();
+  _renderPcRequests();
+  toast(`✅ PC change approved for ${req.empName}.`,'ok');
+}
+
+function rejectPcChange(reqId){
+  db.pcChangeRequests = db.pcChangeRequests||[];
+  const req = db.pcChangeRequests.find(r=>r.id===reqId);
+  if(!req) return;
+  const reason = prompt(`Reject PC change for ${req.empName}?\n\nEnter a reason (optional):`,'');
+  if(reason===null) return;
+
+  req.status = 'rejected';
+  req.rejectReason = reason.trim();
+  req.resolvedAt = new Date().toISOString();
+
+  // Notify employee
+  notify({category:'attendance', icon:'❌', title:'PC Change Rejected',
+    msg:`Your request to change your registered PC was rejected.${reason.trim() ? ' Reason: '+reason.trim() : ''} Please contact your manager.`,
+    for: req.empId, isEmp: true});
+
+  saveDB();
+  _renderPcRequests();
+  toast(`PC change request rejected for ${req.empName}.`,'warn');
+}
+
+// ── Render PC change requests panel for managers ──
+function _renderPcRequests(){
+  const el = document.getElementById('att-pc-requests');
+  if(!el) return;
+  db.pcChangeRequests = db.pcChangeRequests||[];
+  const myEmpIds = db.employees.filter(e=>(e.managerIds||[e.managerId]).includes(CU.id)).map(e=>String(e.id));
+  const pending = db.pcChangeRequests.filter(r=>r.status==='pending' && myEmpIds.includes(String(r.empId)));
+  if(!pending.length){ el.style.display='none'; return; }
+  el.style.display='block';
+  el.innerHTML=`<div style="font-weight:700;font-size:14px;margin-bottom:12px;color:var(--blue);">🖥️ PC Change Requests <span style="background:var(--blue);color:#fff;border-radius:10px;padding:1px 8px;font-size:12px;">${pending.length}</span></div>`+
+  pending.map(r=>`
+    <div style="background:var(--surface2);border-radius:10px;padding:14px 16px;margin-bottom:10px;border-left:4px solid var(--orange);">
+      <div style="font-weight:600;font-size:13px;">${r.empName}</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:4px;">
+        Old IP: <code style="background:var(--surface);padding:1px 5px;border-radius:4px;">${r.oldIp}</code> →
+        New IP: <code style="background:var(--surface);padding:1px 5px;border-radius:4px;">${r.newIp}</code>
+      </div>
+      <div style="font-size:12px;margin-top:4px;"><strong>Reason:</strong> ${r.reason}</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:3px;">${new Date(r.requestedAt).toLocaleString('en-IN')}</div>
+      <div style="margin-top:10px;display:flex;gap:8px;">
+        <button class="bsm" style="background:var(--green);color:#fff;border:none;font-size:12px;" onclick="approvePcChange(${r.id})">✅ Approve</button>
+        <button class="bsm b-ghost" style="font-size:12px;color:var(--red);" onclick="rejectPcChange(${r.id})">❌ Reject</button>
+      </div>
+    </div>
+  `).join('');
+}
+
 function checkAutoPunch(){}
 
 // ── Live clock updater ──
@@ -5977,6 +6167,8 @@ function renderAttendance(){
     document.getElementById('att-device-banner').style.display='none';
     // Show sub-tab bar for managers
     const _attTabsEl=document.getElementById('att-tabs'); if(_attTabsEl) _attTabsEl.style.display='flex';
+    // Show PC change requests panel
+    _renderPcRequests();
     if(_attTab==='today'){
       const _tp=document.getElementById('att-today-panel'); if(_tp) _tp.style.display='block';
       const _st=document.getElementById('att-stats'); if(_st) _st.style.display='none';
@@ -6039,86 +6231,38 @@ function renderAttendance(){
           banner.style.cssText='display:block;background:#f0fdf4;border:1.5px solid #34d399;border-radius:12px;padding:11px 18px;margin-bottom:18px;font-size:13px;color:#065f46;';
           banner.innerHTML=`✅ <strong>Registered PC</strong> — IP: <code style="background:#d1fae5;padding:1px 6px;border-radius:4px;">${currentIp}</code> &nbsp;·&nbsp; ${getDeviceName()}
             <button onclick="registerDevice()" style="margin-left:12px;background:transparent;color:#059669;border:1px solid #34d399;padding:3px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;">🔄 Re-register</button>`;
-          // Re-render attendance to show correct button states
-          const rec2 = getTodayRecord(CU.empId);
-          const ciBtn2=document.getElementById('att-checkin-btn');
-          const coBtn2=document.getElementById('att-checkout-btn');
-          const stEl2=document.getElementById('att-punch-status');
-          const ntEl2=document.getElementById('att-today-note');
-          if(!rec2||!rec2.checkIn){
-            if(ciBtn2){ ciBtn2.style.display='flex'; ciBtn2.disabled=false; ciBtn2.innerHTML='🟢 Login'; }
-            if(coBtn2) coBtn2.style.display='none';
-            if(stEl2) stEl2.innerHTML='<span style="color:var(--orange);font-weight:600;">⏳ Not checked in yet</span>';
-            if(ntEl2) ntEl2.textContent='Click Login when you start work.';
-          } else if(rec2.checkIn&&!rec2.checkOut){
-            if(ciBtn2) ciBtn2.style.display='none';
-            if(coBtn2){ coBtn2.style.display='flex'; coBtn2.disabled=false; coBtn2.innerHTML='🔴 Logout'; }
-            if(stEl2) stEl2.innerHTML=`<span style="color:var(--green);font-weight:600;">🟢 Logged in at ${rec2.checkIn}</span>`;
-            if(ntEl2) ntEl2.textContent='Click Logout before you leave.';
-          } else {
-            if(ciBtn2) ciBtn2.style.display='none';
-            if(coBtn2) coBtn2.style.display='none';
-            const dur2=calcDuration(rec2.checkIn,rec2.checkOut);
-            if(stEl2) stEl2.innerHTML=`<span style="color:var(--blue);font-weight:600;">✅ Day complete — Total hours: ${dur2}</span>`;
-            if(ntEl2) ntEl2.textContent='Have a great rest of your day!';
-          }
+          // Show today card and correct button states
+          _showTodayCard();
         } else {
-          // IP mismatch — block
+          // IP mismatch — block + allow request
           banner.style.cssText='display:block;background:#fff1f2;border:1.5px solid #fca5a5;border-radius:12px;padding:14px 18px;margin-bottom:18px;font-size:13px;';
+          const hasPending = (db.pcChangeRequests||[]).find(r=>String(r.empId)===String(CU.empId)&&r.status==='pending');
           banner.innerHTML=`<strong>⛔ Unregistered PC</strong> — Attendance can only be marked from your registered PC.<br>
             <div style="margin-top:8px;font-size:12px;color:#7f1d1d;">
               Registered IP: <code style="background:#fee2e2;padding:1px 6px;border-radius:4px;">${registeredIp}</code><br>
               Your current IP: <code style="background:#fee2e2;padding:1px 6px;border-radius:4px;">${currentIp}</code>
             </div>
-            <div style="margin-top:8px;font-size:11px;color:#991b1b;">To switch your registered PC, contact your manager or re-register from the correct PC.</div>`;
+            ${hasPending
+              ? `<div style="margin-top:10px;background:#fef9c3;border:1px solid #fde047;border-radius:8px;padding:8px 12px;font-size:12px;color:#713f12;">⏳ <strong>PC change request pending</strong> — Waiting for manager approval.</div>`
+              : `<button onclick="requestPcChange('${currentIp}')" style="margin-top:10px;background:#2563eb;color:#fff;border:none;padding:7px 16px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;font-family:'Poppins',sans-serif;">📩 Request PC Change</button>
+                 <div style="margin-top:6px;font-size:11px;color:#991b1b;">Your manager will be notified to approve your new PC.</div>`
+            }`;
           const _ciB2=document.getElementById('att-checkin-btn');
           const _coB2=document.getElementById('att-checkout-btn');
           if(_ciB2) _ciB2.style.display='none';
           if(_coB2) _coB2.style.display='none';
           const _stEl2=document.getElementById('att-punch-status');
           if(_stEl2) _stEl2.innerHTML='<span style="color:var(--red);font-weight:600;">⛔ PC not authorised</span>';
+          _showTodayCard(true); // show card but keep buttons hidden
         }
       });
-      // While IP is being fetched — don't show check-in buttons yet
+      // Show today card immediately (buttons will be set after IP resolves)
+      _showTodayCard(true);
       return;
     }
 
-    // Today card display for non-IP-blocked path (mobile — GPS handles auth)
-    const todayCard = document.getElementById('att-today-card');
-    todayCard.style.display='block';
-    document.getElementById('att-today-date').textContent =
-      new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-
-    const rec = getTodayRecord(CU.empId);
-    const ciEl  = document.getElementById('att-ci-time');
-    const coEl  = document.getElementById('att-co-time');
-    const durEl = document.getElementById('att-duration');
-    const noteEl= document.getElementById('att-today-note');
-    const ciBtn = document.getElementById('att-checkin-btn');
-    const coBtn = document.getElementById('att-checkout-btn');
-    const statusEl = document.getElementById('att-punch-status');
-
-    ciEl.textContent  = rec?.checkIn  || '—';
-    coEl.textContent  = rec?.checkOut || '—';
-    durEl.textContent = rec ? calcDuration(rec.checkIn, rec.checkOut) : '—';
-
-    if(!rec || !rec.checkIn){
-      ciBtn.style.display='flex'; coBtn.style.display='none';
-      statusEl.innerHTML='<span style="color:var(--orange);font-weight:600;">⏳ Not checked in yet</span>';
-      noteEl.textContent='Click Login when you start work.';
-    } else if(rec.checkIn && !rec.checkOut){
-      ciBtn.style.display='none'; coBtn.style.display='flex';
-      statusEl.innerHTML=`<span style="color:var(--green);font-weight:600;">🟢 Logged in at ${rec.checkIn}</span>`;
-      noteEl.textContent='Click Logout before you leave.';
-    } else {
-      ciBtn.style.display='none'; coBtn.style.display='none';
-      const dur = calcDuration(rec.checkIn, rec.checkOut);
-      statusEl.innerHTML=`<span style="color:var(--blue);font-weight:600;">✅ Day complete — Total hours: ${dur}</span>`;
-      noteEl.textContent='Have a great rest of your day!';
-    }
-
-    // Start live clock
-    startLiveClock();
+    // Today card display for mobile path (GPS handles auth)
+    _showTodayCard();
   }
 
   // Filter records
