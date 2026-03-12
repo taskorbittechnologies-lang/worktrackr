@@ -315,6 +315,66 @@ tr:hover td{background:var(--surface2);}
 
 .sec-lbl{font-size:10px;font-weight:500;margin-bottom:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
 .mandatory-note{font-size:11px;color:var(--red);margin-top:4px;display:none;}
+
+/* ══ CROSS-BROWSER FIXES ══ */
+.mbg{-webkit-backdrop-filter:blur(5px);backdrop-filter:blur(5px);}
+input,select,button,textarea{-webkit-appearance:none;-moz-appearance:none;}
+select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236b7280'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:28px !important;}
+button{-webkit-appearance:none;font-family:'Poppins',sans-serif;}
+*{-webkit-tap-highlight-color:transparent;}
+#auth{height:100svh;height:100vh;}
+#app,#pending-screen{min-height:100svh;min-height:100vh;}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:10px;}
+
+/* ══ MOBILE HAMBURGER ══ */
+#mob-menu-btn{display:none;position:fixed;top:14px;left:14px;z-index:1001;background:var(--accent);color:#fff;border:none;border-radius:9px;width:40px;height:40px;font-size:20px;cursor:pointer;align-items:center;justify-content:center;box-shadow:var(--sh-lg);}
+#mob-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:999;}
+
+/* ══ TABLET ≤900px ══ */
+@media(max-width:900px){
+  .auth-left{display:none;}
+  .auth-right{width:100%;padding:24px 16px;}
+  .auth-card{padding:28px 20px;border-radius:16px;}
+  .sidebar{transform:translateX(-100%);transition:transform .25s ease;z-index:1000;width:240px;}
+  .sidebar.mob-open{transform:translateX(0);}
+  #mob-menu-btn{display:flex;}
+  #mob-overlay.mob-open{display:block;}
+  .main{margin-left:0;padding:68px 16px 24px;}
+  .sgrid{grid-template-columns:repeat(2,1fr);}
+  .pipeline{grid-template-columns:1fr;}
+  .frow{grid-template-columns:1fr;}
+  .ej-fields{grid-template-columns:1fr;}
+  .tw{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  table{min-width:560px;}
+  .ph{flex-wrap:wrap;gap:10px;}
+}
+
+/* ══ MOBILE ≤600px ══ */
+@media(max-width:600px){
+  body{font-size:12px;}
+  .auth-card{padding:20px 14px;}
+  .auth-h{font-size:18px;}
+  .main{padding:58px 10px 20px;}
+  .sgrid{grid-template-columns:1fr 1fr;gap:8px;}
+  .sc{padding:12px;}
+  .pipeline{grid-template-columns:1fr;}
+  .tc{padding:12px;gap:8px;}
+  .mbox{width:100% !important;max-width:100% !important;border-radius:16px 16px 0 0 !important;position:fixed !important;bottom:0 !important;margin:0 !important;max-height:88vh;overflow-y:auto;}
+  .mbg{align-items:flex-end !important;}
+  .tw{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  table{min-width:480px;}
+  .filters{flex-wrap:wrap;gap:5px;}
+  .ph{flex-direction:column;}
+  .ph h2,.ph h1{font-size:15px;}
+  #toasts{top:auto;bottom:70px;right:8px;left:8px;align-items:center;}
+  .toast{max-width:100%;justify-content:center;}
+  #att-today-chips{flex-wrap:wrap !important;gap:5px !important;}
+  .btn-p{font-size:14px;padding:13px;}
+  #notif-tabs{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  .ntab{white-space:nowrap;flex-shrink:0;}
+}
 </style>
 </head>
 <body>
@@ -529,69 +589,54 @@ tr:hover td{background:var(--surface2);}
       <!-- ── MANAGER SETUP ── -->
       <div id="f-manager-setup" style="display:none">
 
-        <!-- ── Step 1: Details ── -->
+        <!-- Single-step: no OTP, no approval needed -->
         <div id="mgr-setup-step1">
           <div class="reg-note" style="background:#e8eeff;border-color:#a5b4fc;color:#1e3a8a;line-height:1.7;">
-            👔 <strong>Create a Manager Account</strong> — Set up your WorkTrackr workspace. Use the default code <strong>ADMIN2024</strong> to get started.
+            👔 <strong>Create a Manager Account</strong> — Fill your details and your account is created instantly. No OTP or approval needed.
           </div>
 
-          <!-- Setup Code — prominent box -->
-          <div style="background:linear-gradient(135deg,#f5f3ff,#ede9fe);border:2px solid #a78bfa;border-radius:12px;padding:16px 18px;margin-bottom:18px;">
+          <div style="background:linear-gradient(135deg,#f5f3ff,#ede9fe);border:2px solid #a78bfa;border-radius:12px;padding:14px 18px;margin-bottom:16px;">
             <div style="font-weight:700;font-size:13px;color:#5b21b6;margin-bottom:8px;">🔑 Admin Setup Code <span style="color:var(--red)">*</span></div>
             <div class="pw-wrap">
               <input id="ms-code" type="text" placeholder="ADMIN2024" value="ADMIN2024" style="font-size:15px;font-weight:700;letter-spacing:2px;color:#5b21b6;"/>
               <span class="pw-eye" onclick="togpw('ms-code',this)">👁</span>
             </div>
-            <div style="font-size:12px;color:#6d28d9;margin-top:6px;line-height:1.6;">
-              Default code is <strong>ADMIN2024</strong> — already filled in. If an existing manager shared a custom code with you, replace it above.
-            </div>
+            <div style="font-size:12px;color:#6d28d9;margin-top:5px;">Default is <strong>ADMIN2024</strong> — already filled. Replace only if an existing manager gave you a custom code.</div>
           </div>
-          <div class="field"><label>Full Name</label><input id="ms-name" placeholder="Your full name"/></div>
-          <div class="field"><label>Email Address</label><input id="ms-email" type="email" placeholder="your@email.com"/></div>
+
+          <div class="field"><label>Full Name <span style="color:var(--red)">*</span></label><input id="ms-name" placeholder="Your full name"/></div>
+          <div class="field"><label>Email Address <span style="color:var(--red)">*</span></label><input id="ms-email" type="email" placeholder="your@email.com"/></div>
           <div class="field">
             <label>Mobile Number <span style="color:var(--red)">*</span></label>
             <div style="display:flex;gap:8px;align-items:center;">
               <div style="background:var(--surface2);border:1.5px solid var(--border);border-radius:9px;padding:11px 13px;font-size:14px;color:var(--muted);white-space:nowrap;">+91</div>
               <input id="ms-phone" type="tel" maxlength="10" placeholder="10-digit mobile number" style="flex:1;"/>
             </div>
-            <div style="font-size:11px;color:var(--muted);margin-top:4px;">OTP will be sent to verify your mobile number.</div>
           </div>
           <div class="field">
-            <label>Password</label>
+            <label>Password <span style="color:var(--red)">*</span></label>
             <div class="pw-wrap"><input id="ms-pw" type="password" placeholder="Min. 6 characters" oninput="pwstrMgr(this)"/>
             <span class="pw-eye" onclick="togpw('ms-pw',this)">👁</span></div>
             <div class="pw-bar" id="pwbar-mgr"></div>
             <div class="pw-hint" id="pwhint-mgr">Min. 6 characters</div>
           </div>
-          <div class="field"><label>Confirm Password</label><input id="ms-conf" type="password" placeholder="Re-enter password"/></div>
-          <div id="mgr-setup-warn" style="display:none;background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:10px 13px;font-size:13px;color:#856404;margin-bottom:12px;">
-            ⚠️ A manager account already exists (<span id="existing-mgr-id"></span>). Creating a new one will add another manager to the workspace.
+          <div class="field"><label>Confirm Password <span style="color:var(--red)">*</span></label>
+            <div class="pw-wrap"><input id="ms-conf" type="password" placeholder="Re-enter password"/>
+            <span class="pw-eye" onclick="togpw('ms-conf',this)">👁</span></div>
           </div>
-          <button class="btn-p" style="background:var(--purple);" onclick="mgrSetupStep1()">Send OTP to Verify Mobile →</button>
+          <div id="mgr-setup-warn" style="display:none;background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:10px 13px;font-size:13px;color:#856404;margin-bottom:12px;">
+            ⚠️ A manager account already exists (<span id="existing-mgr-id"></span>). Creating a new one will add another manager to this workspace.
+          </div>
+          <button class="btn-p" style="background:var(--purple);" onclick="createManagerDirect()">✅ Create Manager Account →</button>
           <div class="auth-sw">Already have an account? <a onclick="atab('login')">Sign In</a></div>
         </div>
 
-        <!-- ── Step 2: OTP Verification ── -->
-        <div id="mgr-setup-step2" style="display:none;">
-          <div style="text-align:center;margin-bottom:18px;">
-            <div style="font-size:32px;margin-bottom:8px;">📱</div>
-            <div style="font-weight:700;font-size:16px;color:var(--text);">Verify Your Mobile</div>
-            <div style="font-size:13px;color:var(--muted);margin-top:4px;">OTP sent to <strong>+91 <span id="ms-phone-display"></span></strong></div>
-          </div>
-          <div id="ms-otp-demo" style="display:none;background:#e8f5e9;border:1px solid #a5d6a7;border-radius:9px;padding:10px 13px;font-size:13px;color:#1b5e20;margin-bottom:14px;text-align:center;"></div>
-          <div style="display:flex;gap:10px;justify-content:center;margin-bottom:6px;">
-            <input class="otp-box" id="mo1" maxlength="1" oninput="otpMove(this,'mo2')" onkeydown="otpBack(event,this,'')" type="tel"/>
-            <input class="otp-box" id="mo2" maxlength="1" oninput="otpMove(this,'mo3')" onkeydown="otpBack(event,this,'mo1')" type="tel"/>
-            <input class="otp-box" id="mo3" maxlength="1" oninput="otpMove(this,'mo4')" onkeydown="otpBack(event,this,'mo2')" type="tel"/>
-            <input class="otp-box" id="mo4" maxlength="1" oninput="otpMove(this,'mo5')" onkeydown="otpBack(event,this,'mo3')" type="tel"/>
-            <input class="otp-box" id="mo5" maxlength="1" oninput="otpMove(this,'mo6')" onkeydown="otpBack(event,this,'mo4')" type="tel"/>
-            <input class="otp-box" id="mo6" maxlength="1" oninput="otpMove(this,'')"   onkeydown="otpBack(event,this,'mo5')" type="tel"/>
-          </div>
-          <div id="ms-otp-ok" style="display:none;text-align:center;color:var(--green);font-weight:600;margin-bottom:8px;">✅ Mobile verified!</div>
-          <div id="ms-timer" style="text-align:center;font-size:12px;color:var(--muted);margin-bottom:14px;"></div>
-          <button class="btn-p" style="background:var(--purple);" onclick="verifyMgrOTP()">Verify &amp; Create Account →</button>
-          <div class="auth-sw"><a onclick="resendOTP('mgr')">Resend OTP</a> &nbsp;·&nbsp; <a onclick="mgrSetupBack()">← Back</a></div>
-        </div>
+        <!-- stub kept so old references don't break -->
+        <div id="mgr-setup-step2" style="display:none;"></div>
+        <span id="ms-phone-display" style="display:none;"></span>
+        <span id="ms-otp-ok" style="display:none;"></span>
+        <span id="ms-timer" style="display:none;"></span>
+        <span id="ms-otp-demo" style="display:none;"></span>
 
       </div>
     </div>
@@ -612,7 +657,10 @@ tr:hover td{background:var(--surface2);}
 
 <!-- ═══ APP ═══ -->
 <div id="app">
-  <aside class="sidebar">
+  <!-- Mobile hamburger + overlay -->
+  <button id="mob-menu-btn" onclick="mobToggleSidebar()" aria-label="Open menu">&#9776;</button>
+  <div id="mob-overlay" onclick="mobCloseSidebar()"></div>
+  <aside class="sidebar" id="sidebar">
     <div class="sb-logo">Work<span>Trackr</span><small>From Assigned to Done — Seamlessly.</small></div>
     <nav class="sb-nav">
       <div class="sb-sec">Overview</div>
@@ -2625,8 +2673,8 @@ function mgrSetupBack(){
   aclear();
 }
 
-// Step 1 — validate all fields then send OTP
-async function mgrSetupStep1(){
+// Direct manager account creation — no OTP, no approval
+function createManagerDirect(){
   aclear();
   const code  = document.getElementById('ms-code').value.trim();
   const name  = document.getElementById('ms-name').value.trim();
@@ -2634,79 +2682,62 @@ async function mgrSetupStep1(){
   const phone = document.getElementById('ms-phone').value.trim();
   const pw    = document.getElementById('ms-pw').value;
   const conf  = document.getElementById('ms-conf').value;
+
+  // Validate setup code
   const globalCode = db.adminSetupCode||'ADMIN2024';
-  const linkedMgr  = db.managers.find(m=>m.setupCode&&m.setupCode===code);
+  const linkedMgr  = db.managers.find(m=>m.setupCode && m.setupCode===code);
   if(!code){aerr('Please enter the Admin Setup Code.');return;}
-  if(code!==globalCode && !linkedMgr){aerr('Incorrect Setup Code. Use ADMIN2024 or a Manager Setup Code.');return;}
+  if(code!==globalCode && !linkedMgr){aerr('Incorrect Setup Code. Try ADMIN2024 or a code shared by an existing manager.');return;}
+
+  // Validate fields
   if(!name){aerr('Please enter your full name.');return;}
   if(!email||!email.includes('@')){aerr('Please enter a valid email address.');return;}
   if(phone.length!==10||isNaN(Number(phone))){aerr('Please enter a valid 10-digit mobile number.');return;}
   if(!pw||pw.length<6){aerr('Password must be at least 6 characters.');return;}
   if(pw!==conf){aerr('Passwords do not match.');return;}
-  if(db.managers.find(m=>m.userId===email)){aerr('A manager with this email already exists.');return;}
-  if(db.employees.find(e=>e.userId===email)){aerr('An employee with this email already exists.');return;}
+  if(db.managers.find(m=>m.userId===email)){aerr('A manager with this email already exists. Please sign in.');return;}
+  if(db.employees.find(e=>e.userId===email)){aerr('An employee account with this email already exists.');return;}
   if(db.managers.find(m=>m.phone===phone)){aerr('This mobile number is already registered to a manager.');return;}
-  // Store for step 2
-  otpState.mgrData = {code, name, email, phone, pw, linkedMgr:linkedMgr||null};
-  // Generate and send OTP
-  const otp = genOTP();
-  Object.assign(otpState,{code:otp, phone, context:'mgr', verified:false});
-  clearOTPBoxes('mo');
-  document.getElementById('ms-phone-display').textContent = phone;
-  document.getElementById('ms-otp-ok').style.display='none';
-  document.getElementById('mgr-setup-step1').style.display='none';
-  document.getElementById('mgr-setup-step2').style.display='block';
-  startOTPTimer('ms-timer');
-  const res = await sendSMS(phone, otp);
-  if(res?.simulated){
-    const demoEl = document.getElementById('ms-otp-demo');
-    demoEl.style.display='block';
-    demoEl.innerHTML=`⚠️ <strong>Demo Mode</strong> — Your OTP is: <span style="font-size:18px;letter-spacing:3px;font-weight:700;">${otp}</span>`;
-    otp.split('').forEach((ch,i)=>{const el=document.getElementById('mo'+(i+1));if(el)el.value=ch;});
-  }
-  toast('OTP sent to +91 '+phone,'ok');
-}
 
-// Step 2 — verify OTP then create manager account
-function verifyMgrOTP(){
-  aclear();
-  const entered = getOTPInput('mo');
-  if(entered.length<6){aerr('Please enter the 6-digit OTP.');return;}
-  if(Date.now()>otpState.expires){aerr('OTP expired. Please click Resend OTP.');return;}
-  if(entered!==otpState.code){aerr('Incorrect OTP. Please try again.');return;}
-  otpState.verified=true;
-  clearInterval(otpState.timerInterval);
-  document.getElementById('ms-otp-ok').style.display='block';
-  const d2=otpState.mgrData;
+  // Create manager account immediately
   const _sc=()=>{const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let s='';for(let i=0;i<4;i++)s+=c[Math.floor(Math.random()*c.length)];return s;};
   const mgrSetupCode='MGR-'+_sc()+'-'+_sc();
   const newMgr={
-    id:'mgr'+db.nextMgrId++, name:d2.name, userId:d2.email, email:d2.email,
-    password:d2.pw, role:'manager', phone:d2.phone,
+    id:'mgr'+db.nextMgrId++, name, userId:email, email,
+    password:pw, role:'manager', phone,
     setupCode:mgrSetupCode,
-    ej:{pk:'',sid:'',tid:'',me:d2.email,on:false},
+    ej:{pk:'',sid:'',tid:'',me:email,on:false},
     prefs:{assigned:true,complete:true,blocked:true,review:true,overdue:true},
     tags:[{id:'t1',name:'Urgent',color:'#c0472b'},{id:'t2',name:'Internal',color:'#2563a8'},{id:'t3',name:'Client',color:'#2a7c58'}],
     nextTid:1, nextEid:1
   };
-  if(d2.linkedMgr && d2.linkedMgr.id!==newMgr.id){
-    if(!d2.linkedMgr.linkedManagers) d2.linkedMgr.linkedManagers=[];
-    d2.linkedMgr.linkedManagers.push(newMgr.id);
-    newMgr.linkedTo=d2.linkedMgr.id;
+  if(linkedMgr && linkedMgr.id!==newMgr.id){
+    if(!linkedMgr.linkedManagers) linkedMgr.linkedManagers=[];
+    linkedMgr.linkedManagers.push(newMgr.id);
+    newMgr.linkedTo=linkedMgr.id;
   }
   db.managers.push(newMgr);
   saveDB();
-  setTimeout(()=>{
-    alert('🎉 Manager account created!\n\nYour unique Setup Code:\n\n  '+mgrSetupCode+'\n\n⚠ Copy this now — share only with other managers you want linked.\n\nYou can view it anytime in Settings.');
-  },100);
-  toast('Manager account created! Sign in now.','ok');
+
+  // Clear form
   ['ms-code','ms-name','ms-email','ms-phone','ms-pw','ms-conf'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
-  clearOTPBoxes('mo');
-  document.getElementById('mgr-setup-step2').style.display='none';
-  document.getElementById('mgr-setup-step1').style.display='block';
-  setTimeout(()=>{atab('login');document.getElementById('l-uid').value=d2.email;},800);
+  const codeEl=document.getElementById('ms-code'); if(codeEl) codeEl.value='ADMIN2024';
+
+  toast('✅ Manager account created! Signing you in...','ok');
+  setTimeout(()=>{
+    // Auto sign-in directly
+    enterApp({...newMgr, role:'manager'});
+    // Show setup code alert after entering app
+    setTimeout(()=>{
+      alert(`🎉 Welcome to WorkTrackr!\n\nYour Manager Setup Code:\n\n  ${mgrSetupCode}\n\nShare this with other managers you want linked to your workspace.\nYou can always find it in Settings → Business Profile.`);
+    }, 600);
+  }, 400);
 }
 
+// Legacy stubs — kept so any old references don't crash
+async function mgrSetupStep1(){ createManagerDirect(); }
+function verifyMgrOTP(){ toast('Use the Create Account button.','warn'); }
+function mgrSetupBack(){ document.getElementById('mgr-setup-step1').style.display='block'; document.getElementById('mgr-setup-step2').style.display='none'; aclear(); }
 function doManagerSetup(){ mgrSetupStep1(); }
 
 function enterApp(user){
@@ -2742,11 +2773,22 @@ function enterApp(user){
   setTimeout(checkWorkAnniversary, 2800); // Work anniversary popup
 }
 function logout(){CU=null;document.getElementById('app').style.display='none';document.getElementById('auth').style.display='flex';atab('login');}
+function mobToggleSidebar(){
+  const sb=document.getElementById('sidebar');
+  const ov=document.getElementById('mob-overlay');
+  if(sb.classList.contains('mob-open')){mobCloseSidebar();}
+  else{sb.classList.add('mob-open');ov.classList.add('mob-open');}
+}
+function mobCloseSidebar(){
+  document.getElementById('sidebar')?.classList.remove('mob-open');
+  document.getElementById('mob-overlay')?.classList.remove('mob-open');
+}
 
 // ═══════════════════════════════════════════════════
 // NAVIGATION
 // ═══════════════════════════════════════════════════
 function pg(id, keepFilter){
+  mobCloseSidebar();
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
   document.querySelectorAll('.nav-i').forEach(n=>n.classList.remove('on'));
   document.getElementById('page-'+id).classList.add('on');
