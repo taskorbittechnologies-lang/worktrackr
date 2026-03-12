@@ -2164,8 +2164,8 @@ function saveDB(){
   try{
     var serialized = JSON.stringify(db);
     localStorage.setItem(STORAGE_KEY, serialized);
-    // Keep session backup fresh so recovery always has the latest good state
     if(CU && _hasRealData(db)) localStorage.setItem(STORAGE_KEY+'_session_backup', serialized);
+    // NOTE: setItem above fires the 'storage' event in all other tabs/windows (same origin)
   }catch(e){}
   if(!gasUrl) return;
   clearTimeout(_saveTimer);
@@ -2239,8 +2239,25 @@ document.addEventListener('DOMContentLoaded',function(){
   gasUrl = getGasUrl();
   if(!gasUrl && FIREBASE_URL){ gasUrl = FIREBASE_URL; localStorage.setItem(GAS_KEY, gasUrl); }
   if(gasUrl){ var inp=document.getElementById('jb-apikey'); if(inp) inp.value=gasUrl; }
-  // Always launch — loadFromCloud handles Firebase and localStorage-only modes
   loadFromCloud().catch(function(e){ console.warn('Startup error:',e); });
+
+  // Cross-tab/window sync — fixes Edge profile isolation issue
+  // When localStorage is written in another tab (same origin), pick it up here
+  window.addEventListener('storage', function(e){
+    if(!e.key) return;
+    if(e.key===GAS_KEY){ gasUrl=e.newValue; return; }
+    if(e.key!==STORAGE_KEY || !e.newValue) return;
+    try{
+      var fresh=JSON.parse(e.newValue);
+      if(!_hasRealData(fresh)) return;
+      var freshScore=(fresh.managers||[]).length+(fresh.employees||[]).length;
+      var curScore=(db&&db.managers?db.managers.length:0)+(db&&db.employees?db.employees.length:0);
+      if(freshScore>=curScore){
+        db=mergeWithDefaults(fresh);
+        if(!CU) console.log('[WorkTrackr] db synced from another tab');
+      }
+    }catch(err){}
+  });
 });
 const DEFAULT_DB = {
   managers: [],
@@ -2361,7 +2378,19 @@ function atab(t){
   if(t==='forgot')showFpStep(1);
   if(t==='manager-setup')checkExistingMgr();
 }
-function aerr(m){const e=document.getElementById('auth-err');e.textContent=m;e.style.display='block';}
+function aerr(m){
+  const e=document.getElementById('auth-err');
+  // Show firebase setup hint for no-account errors when no Firebase is configured
+  if(!gasUrl && m.includes('No account found')){
+    e.innerHTML=m+'<br><br><span style="font-size:12px;color:#555;">💡 <strong>Using a different browser or device?</strong> Set up <a href="#" onclick="event.preventDefault();showFbSetupFromLogin()" style="color:var(--accent);font-weight:600;">Firebase sync</a> so your account works everywhere.</span>';
+  } else {
+    e.textContent=m;
+  }
+  e.style.display='block';
+}
+function showFbSetupFromLogin(){
+  document.getElementById('fb-setup').style.display='flex';
+}
 function aclear(){document.getElementById('auth-err').style.display='none';}
 function togpw(id,el){const i=document.getElementById(id);if(!i)return;i.type=i.type==='password'?'text':'password';el.textContent=i.type==='password'?'👁':'🙈';el.title=i.type==='password'?'Show password':'Hide password';}
 function pwstr(inp){_pwBar(inp,'pwbar','pwhint');}
@@ -2440,7 +2469,17 @@ async function doLogin(){
     if(loginBtn){ loginBtn.textContent='Sign In →'; loginBtn.disabled=false; }
   }
 
-  // Check all managers
+  // ── Rescue: check all localStorage keys for this user before giving up ──
+  function _tryLoginWith(dbObj){
+    if(!dbObj) return false;
+    const m=dbObj.managers&&dbObj.managers.find(x=>x.userId&&x.userId.toLowerCase()===uid);
+    if(m){ if(pw===m.password){db=mergeWithDefaults(dbObj);try{localStorage.setItem(STORAGE_KEY,JSON.stringify(db));}catch(e){}enterApp({...m,role:'manager'});return true;} }
+    const e=dbObj.employees&&dbObj.employees.find(x=>x.userId&&x.userId.toLowerCase()===uid);
+    if(e){ if(!e.password||e.password===pw){db=mergeWithDefaults(dbObj);try{localStorage.setItem(STORAGE_KEY,JSON.stringify(db));}catch(er){}enterApp({name:e.name,role:'employee',empId:e.id,userId:e.userId,email:e.email,phone:e.phone||'',managerId:e.managerId,managerIds:e.managerIds||[e.managerId]});return true;} }
+    return false;
+  }
+
+  // Check current db
   const mgr=db.managers.find(m=>m.userId.toLowerCase()===uid);
   if(mgr){
     if(pw===mgr.password){enterApp({...mgr,role:'manager'});return;}
@@ -2452,12 +2491,44 @@ async function doLogin(){
     aerr('Your account link request is pending manager approval.');return;
   }
 
-  // Employee check
+  // Employee check in current db
   const emp=db.employees.find(e=>e.userId===uid);
-  if(!emp){aerr('No account found with that email. Please contact your manager to create your account.');return;}
-  if(!emp.password){aerr('Account not yet activated. Contact your manager.');return;}
-  if(emp.password!==pw){aerr('Incorrect password. Please try again.');return;}
-  enterApp({name:emp.name,role:'employee',empId:emp.id,userId:emp.userId,email:emp.email,phone:emp.phone||'',managerId:emp.managerId,managerIds:emp.managerIds||[emp.managerId]});
+  if(emp){
+    if(!emp.password){aerr('Account not yet activated. Contact your manager.');return;}
+    if(emp.password!==pw){aerr('Incorrect password. Please try again.');return;}
+    enterApp({name:emp.name,role:'employee',empId:emp.id,userId:emp.userId,email:emp.email,phone:emp.phone||'',managerId:emp.managerId,managerIds:emp.managerIds||[emp.managerId]});
+    return;
+  }
+
+  // ── Edge/browser isolation rescue: scan ALL localStorage keys for this user ──
+  // This handles the case where the account was created in a different browser profile/window
+  const allKeys = Object.keys(localStorage);
+  const dbKeys = allKeys.filter(k => k.startsWith('worktrackr_') || k.startsWith('taskorbit_')).sort((a,b)=>{
+    // Prioritise session_backup and main key
+    if(a.includes('session_backup')) return -1;
+    if(b.includes('session_backup')) return 1;
+    if(a===STORAGE_KEY) return -1;
+    if(b===STORAGE_KEY) return 1;
+    return 0;
+  });
+
+  for(const key of dbKeys){
+    if(key===STORAGE_KEY) continue; // already checked
+    try{
+      const raw = localStorage.getItem(key);
+      if(!raw) continue;
+      const parsed = JSON.parse(raw);
+      if(_hasRealData(parsed) && _tryLoginWith(parsed)) return;
+    }catch(e){}
+  }
+
+  // Not found anywhere — show helpful context-aware error
+  const noUsers = !db.managers.length && !db.employees.length;
+  if(noUsers){
+    aerr('⚠️ No accounts found in this browser.\n\nIf you already created an account:\n• Set up Firebase (for cross-device sync) in the Firebase Setup screen, OR\n• Use the same browser and profile where you created your account.');
+  } else {
+    aerr('No account found with that email. Check the spelling or contact your manager.');
+  }
 }
 
 // ── REGISTER FLOW ──
