@@ -879,11 +879,11 @@ tr:hover td{background:var(--surface2);}
           <!-- 3 time tiles -->
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:20px;">
             <div style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);border-radius:12px;padding:14px 12px;text-align:center;border:1.5px solid #86efac;">
-              <div style="font-size:10px;font-weight:700;color:#16a34a;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;">🟢 Login</div>
+              <div style="font-size:10px;font-weight:700;color:#16a34a;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;">🟢 Clock In</div>
               <div id="att-ci-time" style="font-family:'Poppins',sans-serif;font-size:22px;font-weight:900;color:#15803d;line-height:1;">—</div>
             </div>
             <div style="background:linear-gradient(135deg,#fff1f2,#ffe4e6);border-radius:12px;padding:14px 12px;text-align:center;border:1.5px solid #fca5a5;">
-              <div style="font-size:10px;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;">🔴 Logout</div>
+              <div style="font-size:10px;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;">🔴 Clock Out</div>
               <div id="att-co-time" style="font-family:'Poppins',sans-serif;font-size:22px;font-weight:900;color:#b91c1c;line-height:1;">—</div>
             </div>
             <div style="background:linear-gradient(135deg,#eff6ff,#dbeafe);border-radius:12px;padding:14px 12px;text-align:center;border:1.5px solid #93c5fd;">
@@ -897,12 +897,12 @@ tr:hover td{background:var(--surface2);}
             <button id="att-checkin-btn" onclick="checkIn()"
               style="width:100%;max-width:320px;background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;border:none;padding:18px 24px;border-radius:14px;font-family:'Poppins',sans-serif;font-weight:900;font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;letter-spacing:.3px;box-shadow:0 4px 18px rgba(22,163,74,.35);transition:transform .1s,box-shadow .1s;"
               onmousedown="this.style.transform='scale(.97)'" onmouseup="this.style.transform='scale(1)'" ontouchstart="this.style.transform='scale(.97)'" ontouchend="this.style.transform='scale(1)'">
-              <span style="font-size:22px;">🟢</span> Mark Attendance
+              <span style="font-size:22px;">🟢</span> Clock In
             </button>
             <button id="att-checkout-btn" onclick="checkOut()"
               style="width:100%;max-width:320px;background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;border:none;padding:18px 24px;border-radius:14px;font-family:'Poppins',sans-serif;font-weight:900;font-size:17px;cursor:pointer;display:none;align-items:center;justify-content:center;gap:10px;letter-spacing:.3px;box-shadow:0 4px 18px rgba(220,38,38,.35);transition:transform .1s,box-shadow .1s;"
               onmousedown="this.style.transform='scale(.97)'" onmouseup="this.style.transform='scale(1)'" ontouchstart="this.style.transform='scale(.97)'" ontouchend="this.style.transform='scale(1)'">
-              <span style="font-size:22px;">🔴</span> Mark Exit
+              <span style="font-size:22px;">🔴</span> Clock Out
             </button>
             <div id="att-today-note" style="font-size:12px;color:var(--muted);text-align:center;"></div>
           </div>
@@ -920,8 +920,8 @@ tr:hover td{background:var(--surface2);}
               <th style="padding:12px 16px;text-align:left;">Date</th>
               <th style="padding:12px 16px;text-align:left;" id="att-th-emp">Employee</th>
               <th style="padding:12px 16px;text-align:left;">Day</th>
-              <th style="padding:12px 16px;text-align:left;">Login Time</th>
-              <th style="padding:12px 16px;text-align:left;">Logout Time</th>
+              <th style="padding:12px 16px;text-align:left;">Clock In</th>
+              <th style="padding:12px 16px;text-align:left;">Clock Out</th>
               <th style="padding:12px 16px;text-align:left;">Duration</th>
               <th style="padding:12px 16px;text-align:left;">Source</th>
               <th style="padding:12px 16px;text-align:left;">Status</th>
@@ -1294,7 +1294,7 @@ tr:hover td{background:var(--surface2);}
     <div style="display:flex;flex-direction:column;gap:10px;">
       <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;">
         <input type="checkbox" id="gps-require-mobile" style="width:16px;height:16px;accent-color:var(--green);" onchange="saveGpsPolicy()"/>
-        <span><strong>Require GPS on mobile</strong> — Mobile employees must be within the set radius to log in/out</span>
+        <span><strong>Require GPS on mobile</strong> — Mobile employees must be within the set radius to clock in/out</span>
       </label>
       <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;">
         <input type="checkbox" id="gps-allow-pc" checked style="width:16px;height:16px;accent-color:var(--blue);" onchange="saveGpsPolicy()"/>
@@ -5831,11 +5831,11 @@ function calcDuration(checkIn, checkOut){
   }catch(e){return '—';}
 }
 
-// ── Login Time ──
+// ── Clock In ──
 function checkIn(){
   if(!CU||CU.role!=='employee') return;
   const rec = getTodayRecord(CU.empId);
-  if(rec && rec.checkIn){ toast('You have already logged in today at '+rec.checkIn,'warn'); return; }
+  if(rec && rec.checkIn){ toast('You have already clocked in today at '+rec.checkIn,'warn'); return; }
 
   // Check if employee is on approved leave today
   const todayDate = todayStr();
@@ -5846,13 +5846,13 @@ function checkIn(){
   );
   if(activeLeave){
     const cfg = LEAVE_CONFIG[activeLeave.type]||LEAVE_CONFIG.other;
-    const proceed = confirm(`${cfg.icon} You are currently on approved ${cfg.label}.\n\n(${activeLeave.from} → ${activeLeave.to})\n\nAre you sure you want to log in today?`);
+    const proceed = confirm(`${cfg.icon} You are currently on approved ${cfg.label}.\n\n(${activeLeave.from} → ${activeLeave.to})\n\nAre you sure you want to clock in today?`);
     if(!proceed) return;
     const emp = db.employees.find(e=>e.id==CU.empId);
     const mgrIds = emp?.managerIds||[emp?.managerId||''];
     mgrIds.forEach(mgrId=>{
       if(mgrId) notify({category:'attendance',icon:'⚠️',title:'On-Leave Login Alert',
-        msg:`${CU.name} logged in today despite being on approved ${cfg.label} (${activeLeave.from}–${activeLeave.to}).`,for:mgrId});
+        msg:`${CU.name} clocked in today despite being on approved ${cfg.label} (${activeLeave.from}–${activeLeave.to}).`,for:mgrId});
     });
   }
 
@@ -5863,7 +5863,7 @@ function checkIn(){
     const label = dateStatus.type==='holiday' ? `🎉 Today is "${dateStatus.label}" (Holiday)` :
                   dateStatus.type==='weekend'  ? `☀ Today is a ${dateStatus.label} (Weekly Off)` :
                   `⏱ Today is a Half Day (${dateStatus.label})`;
-    if(!confirm(`${label}\n\nDo you still want to log in?\n\nYour manager has marked this as a non-working day.`)) return;
+    if(!confirm(`${label}\n\nDo you still want to clock in?\n\nYour manager has marked this as a non-working day.`)) return;
   }
 
   // GPS / source check
@@ -5894,20 +5894,20 @@ function checkIn(){
     const sourceLabel = gps.source==='mobile-gps'
       ? (gps.dist!=null ? ` 📍 GPS verified (${gps.dist}m from office)` : ' 📍 GPS')
       : ' 💻 PC';
-    toast('✅ Logged in at '+time+sourceLabel,'ok');
+    toast('✅ Clocked in at '+time+sourceLabel,'ok');
     renderAttendance();
   }).catch(errMsg=>{
     toast(errMsg,'err');
-    if(ciBtn){ ciBtn.disabled=false; ciBtn.innerHTML='<span style="font-size:22px;">🟢</span> Mark Attendance'; }
+    if(ciBtn){ ciBtn.disabled=false; ciBtn.innerHTML='<span style="font-size:22px;">🟢</span> Clock In'; }
   });
 }
 
-// ── Logout Time ──
+// ── Clock Out ──
 function checkOut(){
   if(!CU||CU.role!=='employee') return;
   const rec = getTodayRecord(CU.empId);
-  if(!rec||!rec.checkIn){ toast('Please login first','err'); return; }
-  if(rec.checkOut){ toast('You have already logged out today at '+rec.checkOut,'warn'); return; }
+  if(!rec||!rec.checkIn){ toast('Please clock in first','err'); return; }
+  if(rec.checkOut){ toast('You have already clocked out today at '+rec.checkOut,'warn'); return; }
 
   const coBtn=document.getElementById('att-checkout-btn');
   if(coBtn){ coBtn.disabled=true; coBtn.innerHTML='<span style="font-size:18px;">📡</span> Checking...'; }
@@ -5923,11 +5923,11 @@ function checkOut(){
     const sourceLabel = gps.source==='mobile-gps'
       ? (gps.dist!=null ? ` 📍 GPS (${gps.dist}m from office)` : ' 📍 GPS')
       : ' 💻 PC';
-    toast('✅ Logged out at '+time+' · Duration: '+dur+sourceLabel,'ok');
+    toast('✅ Clocked out at '+time+' · Duration: '+dur+sourceLabel,'ok');
     renderAttendance();
   }).catch(errMsg=>{
     toast(errMsg,'err');
-    if(coBtn){ coBtn.disabled=false; coBtn.innerHTML='<span style="font-size:22px;">🔴</span> Mark Exit'; }
+    if(coBtn){ coBtn.disabled=false; coBtn.innerHTML='<span style="font-size:22px;">🔴</span> Clock Out'; }
   });
 }
 
@@ -6247,15 +6247,15 @@ function _renderEmp(selMonth){
 /* helper: set login/logout button state */
 function _setAttButtons(rec, ciBtn, coBtn, statusEl, noteEl){
   if(!rec||!rec.checkIn){
-    if(ciBtn){ciBtn.style.display='flex';ciBtn.disabled=false;ciBtn.innerHTML='<span style="font-size:22px;">🟢</span> Mark Attendance';}
+    if(ciBtn){ciBtn.style.display='flex';ciBtn.disabled=false;ciBtn.innerHTML='<span style="font-size:22px;">🟢</span> Clock In';}
     if(coBtn) coBtn.style.display='none';
     if(statusEl) statusEl.innerHTML='Not marked yet';
     if(noteEl)   noteEl.textContent='Tap the button when you start work.';
   } else if(rec.checkIn&&!rec.checkOut){
     if(ciBtn) ciBtn.style.display='none';
-    if(coBtn){coBtn.style.display='flex';coBtn.disabled=false;coBtn.innerHTML='<span style="font-size:22px;">🔴</span> Mark Exit';}
+    if(coBtn){coBtn.style.display='flex';coBtn.disabled=false;coBtn.innerHTML='<span style="font-size:22px;">🔴</span> Clock Out';}
     if(statusEl) statusEl.innerHTML=`Logged in at ${rec.checkIn}`;
-    if(noteEl)   noteEl.textContent='Tap Mark Exit before you leave.';
+    if(noteEl)   noteEl.textContent='Tap Clock Out before you leave.';
   } else {
     if(ciBtn) ciBtn.style.display='none';
     if(coBtn) coBtn.style.display='none';
@@ -6278,8 +6278,8 @@ function exportAttendance(){
     records=records.filter(r=>r.empId==CU.empId);
   }
   const header=isMgr
-    ? ['Date','Employee','Day','Login Time','Logout Time','Duration','Status']
-    : ['Date','Day','Login Time','Logout Time','Duration','Status'];
+    ? ['Date','Employee','Day','Clock In','Clock Out','Duration','Status']
+    : ['Date','Day','Clock In','Clock Out','Duration','Status'];
   const rows=records.sort((a,b)=>a.date.localeCompare(b.date)).map(r=>{
     const day=new Date(r.date+'T12:00:00').toLocaleDateString([],{weekday:'short'});
     const dur=calcDuration(r.checkIn,r.checkOut);
@@ -6646,12 +6646,12 @@ const CHANGELOG = [
     manager: [
       { icon: '🔗', text: 'Manager accounts now link via email — no setup code needed.' },
       { icon: '🌿', text: 'Leave management simplified — all leaves go to manager for approval.' },
-      { icon: '✅', text: 'Attendance redesigned — cleaner Mark Attendance / Mark Exit interface.' },
+      { icon: '✅', text: 'Attendance redesigned — cleaner Clock In / Clock Out interface.' },
       { icon: '🖥️', text: 'Attendance fixed for all browsers — records always load correctly.' },
       { icon: '🔄', text: 'Stability fixes — blank screen issues resolved.' },
     ],
     employee: [
-      { icon: '✅', text: 'New attendance interface — tap Mark Attendance to log in, Mark Exit to log out.' },
+      { icon: '✅', text: 'New attendance interface — tap Clock In to start your day, Clock Out to end it.' },
       { icon: '🌿', text: 'Leave applications — apply for any leave type, manager approves each request.' },
       { icon: '🔄', text: 'Stability fixes — blank screen issues resolved.' },
     ]
@@ -6692,12 +6692,12 @@ const CHANGELOG = [
     date: 'March 2026',
     title: 'Login Time & Universal Sync',
     manager: [
-      { icon: '⏰', text: 'Attendance renamed: Check-In / Check-Out is now Login Time / Logout Time.' },
+      { icon: '⏰', text: 'Attendance renamed: Check-In / Check-Out is now Clock In / Clock Out.' },
       { icon: '🌐', text: 'Firebase cloud sync is now automatic — no manual URL entry needed on new devices.' },
       { icon: '☁️', text: 'New Cloud Sync button at the bottom of the sidebar to manage Firebase connection.' },
     ],
     employee: [
-      { icon: '⏰', text: 'Attendance renamed: Check-In / Check-Out is now Login Time / Logout Time.' },
+      { icon: '⏰', text: 'Attendance renamed: Check-In / Check-Out is now Clock In / Clock Out.' },
       { icon: '🌐', text: 'App now works across all browsers — your data syncs automatically via cloud.' },
     ]
   },
