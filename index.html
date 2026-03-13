@@ -480,17 +480,11 @@ tr:hover td{background:var(--surface2);}
           <div class="step-dot idle" id="fs3">3</div>
         </div>
 
-        <!-- Step 1: User ID + phone -->
+        <!-- Step 1: Email only -->
         <div id="fp-step1">
-          <div class="reg-note" style="background:#fdf0e0;border-color:#e8c080;color:#6a3a00;">🔑 Enter your registered email and mobile number to receive a reset OTP.</div>
-          <div class="field"><label>Email Address</label><input id="fp-uid" type="email" placeholder="your@email.com"/></div>
-          <div class="field">
-            <label>Registered Mobile Number</label>
-            <div class="phone-row">
-              <div class="phone-code">🇮🇳 +91</div>
-              <input id="fp-phone" type="tel" maxlength="10" placeholder="10-digit number" style="flex:1;" oninput="this.value=this.value.replace(/\D/g,'')"/>
-            </div>
-          </div>
+          <div class="reg-note" style="background:#fdf0e0;border-color:#e8c080;color:#6a3a00;">🔑 Enter your registered email address to receive a password reset OTP.</div>
+          <div class="field"><label>Email Address</label><input id="fp-uid" type="email" placeholder="your@email.com" onkeydown="if(event.key==='Enter'){event.preventDefault();sendForgotOTP();}"/></div>
+          <span id="fp-phone" style="display:none;"></span>
           <button class="btn-p" onclick="sendForgotOTP()">Send Reset OTP →</button>
           <div class="auth-sw"><a onclick="atab('login')">← Back to Sign In</a></div>
         </div>
@@ -498,9 +492,9 @@ tr:hover td{background:var(--surface2);}
         <!-- Step 2: OTP verify -->
         <div id="fp-step2" style="display:none">
           <div style="text-align:center;margin-bottom:14px;">
-            <div style="font-size:28px;margin-bottom:6px;">📲</div>
+            <div style="font-size:28px;margin-bottom:6px;">📧</div>
             <div style="font-family:'Poppins',sans-serif;font-weight:700;font-size:15px;margin-bottom:4px;">Enter the OTP</div>
-            <div style="font-size:13px;color:var(--muted);">Sent to +91 <span id="fp-phone-display" style="font-weight:600;color:var(--text);"></span></div>
+            <div style="font-size:13px;color:var(--muted);">Sent to <span id="fp-phone-display" style="font-weight:600;color:var(--accent);"></span></div>
           </div>
           <div id="fp-otp-demo" style="display:none;background:var(--orange-l);border:1px solid #e8c080;border-radius:8px;padding:9px;text-align:center;font-size:13px;color:var(--orange);margin-bottom:10px;font-weight:600;"></div>
           <div class="otp-wrap">
@@ -2594,36 +2588,31 @@ function fpBack(){showFpStep(1);}
 async function sendForgotOTP(){
   aclear();
   const uid=document.getElementById('fp-uid').value.trim().toLowerCase();
-  const phone=document.getElementById('fp-phone').value.trim();
-  if(!uid||phone.length!==10){aerr('Please enter your User ID and 10-digit mobile number.');return;}
-  const isManager=!!db.managers.find(m=>m.userId===uid);
+  if(!uid||!uid.includes('@')){aerr('Please enter a valid email address.');return;}
   const mgr=db.managers.find(m=>m.userId===uid);
-  const emp=isManager?null:db.employees.find(e=>e.userId===uid);
-  if(!isManager&&!emp){aerr('User ID not found.');return;}
-  const storedPhone=isManager?mgr.phone:emp?.phone;
-  if(storedPhone&&storedPhone!==phone){aerr('Mobile number does not match our records.');return;}
+  const emp=db.employees.find(e=>e.userId===uid);
+  if(!mgr&&!emp){aerr('No account found with this email address.');return;}
+  const userName = mgr ? mgr.name : emp.name;
   const otp=genOTP();
-  Object.assign(otpState,{code:otp,phone,context:'forgot',verified:false,forgotUserId:uid});
-  document.getElementById('fp-phone-display').textContent=phone;
+  Object.assign(otpState,{code:otp,phone:'',context:'forgot',verified:false,forgotUserId:uid});
+  // Show email in step 2 display
+  document.getElementById('fp-phone-display').textContent=uid;
   clearOTPBoxes('fo');
   showFpStep(2);
   startOTPTimer('fp-timer');
-  // Try SMS first, fall back to email
-  const res=await sendSMS(phone,otp);
-  // Always also send via email if we know the user's email
-  const userEmail = isManager ? mgr?.userId : emp?.userId; // userId is the email
-  if(userEmail && userEmail.includes('@')){
-    const userName = isManager ? mgr?.name : emp?.name;
-    await sendOTPEmail(userEmail, userName, otp).catch(e=>console.warn('OTP email failed:',e));
-    toast('OTP sent to your email (' + userEmail + ')','ok');
-  } else if(res?.simulated){
+  // Send OTP to registered email
+  try{
+    await sendOTPEmail(uid, userName, otp);
+    toast('📧 OTP sent to '+uid+' — check your inbox','ok');
+  }catch(e){
+    // Fallback: show OTP on screen
     const demoEl=document.getElementById('fp-otp-demo');
-    demoEl.style.display='block';
-    demoEl.innerHTML=`⚠️ <strong>Demo Mode</strong> — Your OTP is: <span style="font-size:18px;letter-spacing:3px;">${otp}</span>`;
-    otp.split('').forEach((ch,i)=>{const el=document.getElementById('fo'+(i+1));if(el)el.value=ch;});
-    toast('Reset OTP ready — check the box above','ok');
-  } else {
-    toast('OTP sent!','ok');
+    if(demoEl){
+      demoEl.style.display='block';
+      demoEl.innerHTML=`⚠️ Email delivery issue. Your OTP is: <span style="font-size:18px;letter-spacing:3px;font-weight:700;">${otp}</span>`;
+      otp.split('').forEach((ch,i)=>{const el=document.getElementById('fo'+(i+1));if(el)el.value=ch;});
+    }
+    toast('⚠️ Could not send email — OTP shown above','warn');
   }
 }
 
