@@ -557,9 +557,7 @@ tr:hover td{background:var(--surface2);}
             <input id="ms-link-email" type="email" placeholder="Enter existing manager's email to link workspaces" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:'Poppins',sans-serif;background:var(--surface);color:var(--text);outline:none;"/>
             <div style="font-size:11px;color:var(--muted);margin-top:5px;">Leave blank if you are setting up a new independent workspace.</div>
           </div>
-          <div id="mgr-setup-warn" style="display:none;background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:10px 13px;font-size:13px;color:#856404;margin-bottom:12px;">
-            ⚠️ A manager account already exists (<span id="existing-mgr-id"></span>). Creating a new one will add another manager to the workspace.
-          </div>
+
           <button class="btn-p" style="background:var(--purple);" onclick="createManagerDirect()">✅ Create Manager Account →</button>
           <div class="auth-sw">Already have an account? <a onclick="atab('login')">Sign In</a></div>
         </div>
@@ -862,42 +860,53 @@ tr:hover td{background:var(--surface2);}
       <!-- GPS location banner (employee mobile only) -->
       <div id="att-gps-banner" style="display:none;border-radius:12px;padding:14px 18px;margin-bottom:18px;font-size:13px;"></div>
 
-      <!-- Today's Login / Logout card (employee only) -->
-      <div id="att-today-card" style="display:none;background:var(--surface);border-radius:16px;padding:24px 28px;margin-bottom:22px;box-shadow:var(--sh-lg);border:2px solid var(--border);">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:18px;">
+      <!-- Today's attendance card (employee only) — redesigned -->
+      <div id="att-today-card" style="display:none;margin-bottom:22px;">
+        <!-- Header strip with date + clock -->
+        <div style="background:linear-gradient(135deg,#1e4db7,#0694a2);border-radius:16px 16px 0 0;padding:18px 24px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
           <div>
-            <div style="font-family:'Poppins',sans-serif;font-weight:800;font-size:17px;color:var(--text);">📅 Today — <span id="att-today-date"></span></div>
-            <div id="att-punch-status" style="font-size:13px;color:var(--muted);margin-top:4px;"></div>
+            <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,.7);text-transform:uppercase;letter-spacing:1px;margin-bottom:2px;">Today</div>
+            <div id="att-today-date" style="font-family:'Poppins',sans-serif;font-weight:800;font-size:16px;color:#fff;"></div>
           </div>
-          <div id="att-live-clock" style="font-family:'Poppins',sans-serif;font-size:22px;font-weight:800;color:var(--accent);letter-spacing:1px;"></div>
-        </div>
-
-        <!-- Time display row -->
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:18px;">
-          <div style="background:var(--green-l);border-radius:12px;padding:14px;text-align:center;border:1.5px solid #b0dcc8;">
-            <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Login Time</div>
-            <div id="att-ci-time" style="font-family:'Poppins',sans-serif;font-size:20px;font-weight:800;color:var(--green);">—</div>
-          </div>
-          <div style="background:var(--red-l);border-radius:12px;padding:14px;text-align:center;border:1.5px solid #f0b8b8;">
-            <div style="font-size:11px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Logout Time</div>
-            <div id="att-co-time" style="font-family:'Poppins',sans-serif;font-size:20px;font-weight:800;color:var(--red);">—</div>
-          </div>
-          <div style="background:var(--blue-l);border-radius:12px;padding:14px;text-align:center;border:1.5px solid #b0ccf0;">
-            <div style="font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Duration</div>
-            <div id="att-duration" style="font-family:'Poppins',sans-serif;font-size:20px;font-weight:800;color:var(--blue);">—</div>
+          <div style="text-align:right;">
+            <div id="att-live-clock" style="font-family:'Poppins',sans-serif;font-size:28px;font-weight:900;color:#fff;letter-spacing:2px;line-height:1;"></div>
+            <div id="att-punch-status" style="font-size:11px;color:rgba(255,255,255,.75);margin-top:3px;"></div>
           </div>
         </div>
 
-        <!-- Action buttons -->
-        <div style="display:flex;gap:12px;flex-wrap:wrap;">
-          <button id="att-checkin-btn" onclick="checkIn()" style="flex:1;min-width:140px;background:linear-gradient(135deg,var(--green),#0a7a50);color:#fff;border:none;padding:13px 20px;border-radius:11px;font-family:'Poppins',sans-serif;font-weight:800;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
-            🟢 Login
-          </button>
-          <button id="att-checkout-btn" onclick="checkOut()" style="flex:1;min-width:140px;background:linear-gradient(135deg,var(--red),#a01a1a);color:#fff;border:none;padding:13px 20px;border-radius:11px;font-family:'Poppins',sans-serif;font-weight:800;font-size:14px;cursor:pointer;display:none;align-items:center;justify-content:center;gap:8px;">
-            🔴 Logout
-          </button>
+        <!-- Time tiles + action area -->
+        <div style="background:var(--surface);border-radius:0 0 16px 16px;border:2px solid var(--border);border-top:none;padding:20px 24px;box-shadow:var(--sh-lg);">
+          <!-- 3 time tiles -->
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:20px;">
+            <div style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);border-radius:12px;padding:14px 12px;text-align:center;border:1.5px solid #86efac;">
+              <div style="font-size:10px;font-weight:700;color:#16a34a;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;">🟢 Login</div>
+              <div id="att-ci-time" style="font-family:'Poppins',sans-serif;font-size:22px;font-weight:900;color:#15803d;line-height:1;">—</div>
+            </div>
+            <div style="background:linear-gradient(135deg,#fff1f2,#ffe4e6);border-radius:12px;padding:14px 12px;text-align:center;border:1.5px solid #fca5a5;">
+              <div style="font-size:10px;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;">🔴 Logout</div>
+              <div id="att-co-time" style="font-family:'Poppins',sans-serif;font-size:22px;font-weight:900;color:#b91c1c;line-height:1;">—</div>
+            </div>
+            <div style="background:linear-gradient(135deg,#eff6ff,#dbeafe);border-radius:12px;padding:14px 12px;text-align:center;border:1.5px solid #93c5fd;">
+              <div style="font-size:10px;font-weight:700;color:#2563eb;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;">⏱ Hours</div>
+              <div id="att-duration" style="font-family:'Poppins',sans-serif;font-size:22px;font-weight:900;color:#1d4ed8;line-height:1;">—</div>
+            </div>
+          </div>
+
+          <!-- Big action button area -->
+          <div id="att-action-area" style="display:flex;flex-direction:column;align-items:center;gap:12px;">
+            <button id="att-checkin-btn" onclick="checkIn()"
+              style="width:100%;max-width:320px;background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;border:none;padding:18px 24px;border-radius:14px;font-family:'Poppins',sans-serif;font-weight:900;font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;letter-spacing:.3px;box-shadow:0 4px 18px rgba(22,163,74,.35);transition:transform .1s,box-shadow .1s;"
+              onmousedown="this.style.transform='scale(.97)'" onmouseup="this.style.transform='scale(1)'" ontouchstart="this.style.transform='scale(.97)'" ontouchend="this.style.transform='scale(1)'">
+              <span style="font-size:22px;">🟢</span> Mark Attendance
+            </button>
+            <button id="att-checkout-btn" onclick="checkOut()"
+              style="width:100%;max-width:320px;background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;border:none;padding:18px 24px;border-radius:14px;font-family:'Poppins',sans-serif;font-weight:900;font-size:17px;cursor:pointer;display:none;align-items:center;justify-content:center;gap:10px;letter-spacing:.3px;box-shadow:0 4px 18px rgba(220,38,38,.35);transition:transform .1s,box-shadow .1s;"
+              onmousedown="this.style.transform='scale(.97)'" onmouseup="this.style.transform='scale(1)'" ontouchstart="this.style.transform='scale(.97)'" ontouchend="this.style.transform='scale(1)'">
+              <span style="font-size:22px;">🔴</span> Mark Exit
+            </button>
+            <div id="att-today-note" style="font-size:12px;color:var(--muted);text-align:center;"></div>
+          </div>
         </div>
-        <div id="att-today-note" style="font-size:11px;color:var(--muted);margin-top:10px;text-align:center;"></div>
       </div>
 
       <!-- Stats row -->
@@ -1857,7 +1866,7 @@ function fbEndpoint(){
 // Fetch with 12-second timeout using Promise.race (no AbortController)
 async function fbFetch(url, opts){
   var timeoutPromise = new Promise(function(_,reject){
-    setTimeout(function(){ reject(new Error('Connection timed out (12s). Check: Firebase Rules published with read+write=true, and internet is working.')); }, 12000);
+    setTimeout(function(){ reject(new Error('Connection timed out (6s). Check: Firebase Rules published with read+write=true, and internet is working.')); }, 6000);
   });
   try{
     var fetchPromise = fetch(url, opts);
@@ -1926,88 +1935,83 @@ function showErr(el, msg){
 async function loadFromCloud(){
   showLoading('Loading WorkTrackr...');
 
-  // CASE 1: No Firebase URL — run fully from localStorage
-  if(!gasUrl){
-    var cached = localStorage.getItem(STORAGE_KEY);
-    if(cached){
-      try{
-        db = mergeWithDefaults(JSON.parse(cached));
-        hideLoading(); document.getElementById('fb-setup').style.display='none';
-        onDataReady(); return;
-      }catch(ex){}
-    }
-    db = JSON.parse(JSON.stringify(DEFAULT_DB));
-    try{localStorage.setItem(STORAGE_KEY,JSON.stringify(db));}catch(ex){}
-    hideLoading(); document.getElementById('fb-setup').style.display='none';
-    onDataReady(); return;
-  }
-
-  // CASE 2: Firebase URL exists — try to connect
-  // ALWAYS load local cache first so the app is never blank
+  // Always load localStorage cache first — show app immediately, never block on network
   var localCached = localStorage.getItem(STORAGE_KEY);
   var localDb = null;
   if(localCached){
     try{ localDb = mergeWithDefaults(JSON.parse(localCached)); }catch(ex){}
   }
 
-  try{
-    document.getElementById('fb-loading-txt').textContent='Connecting to Firebase...';
-    var data = await fbRead();
+  // CASE 1: No Firebase URL — run fully from localStorage
+  if(!gasUrl){
+    db = localDb || JSON.parse(JSON.stringify(DEFAULT_DB));
+    if(!localDb) try{localStorage.setItem(STORAGE_KEY,JSON.stringify(db));}catch(ex){}
+    hideLoading(); document.getElementById('fb-setup').style.display='none';
+    onDataReady(); return;
+  }
 
+  // CASE 2: Firebase URL exists
+  // Show the app immediately from cache so login is never blocked
+  if(localDb && _hasRealData(localDb)){
+    db = localDb;
+    hideLoading();
+    document.getElementById('fb-setup').style.display='none';
+    onDataReady();
+    // Sync with Firebase in background — update db silently if cloud is richer
+    _syncFromFirebaseBackground();
+    return;
+  }
+
+  // No local cache — must wait for Firebase (first-time install)
+  try{
+    document.getElementById('fb-loading-txt').textContent='First time setup — connecting...';
+    var data = await fbRead();
     if(!data || !_hasRealData(data)){
-      // Firebase returned null/empty — this is a NEW installation only if local is also empty
-      if(localDb && _hasRealData(localDb)){
-        // Local has real data - Firebase is empty due to glitch or first sync from this device
-        // RESTORE local data TO Firebase — never use empty cloud to wipe good local data
-        db = localDb;
-        document.getElementById('fb-loading-txt').textContent='Restoring data to cloud...';
-        await fbWrite(db);
-        toast('✅ Local data restored to cloud!','ok');
-      } else {
-        // Genuinely new installation on all devices
-        db = JSON.parse(JSON.stringify(DEFAULT_DB));
-        document.getElementById('fb-loading-txt').textContent='First-time setup — saving...';
-        await fbWrite(db);
-      }
+      db = JSON.parse(JSON.stringify(DEFAULT_DB));
+      await fbWrite(db);
     } else {
-      // Firebase has real data
-      var cloudDb = mergeWithDefaults(data);
-      // Safety: if cloud has fewer accounts than local, prefer the richer one
-      if(localDb && _hasRealData(localDb)){
-        var cloudScore = (cloudDb.managers||[]).length + (cloudDb.employees||[]).length + (cloudDb.tasks||[]).length;
-        var localScore = (localDb.managers||[]).length  + (localDb.employees||[]).length  + (localDb.tasks||[]).length;
-        db = cloudScore >= localScore ? cloudDb : localDb;
-        if(cloudScore < localScore){
-          // Local is richer — push it back
-          await fbWrite(db);
-          toast('⚠ Local data was more complete — restored to cloud.','warn');
-        }
-      } else {
-        db = cloudDb;
-      }
+      db = mergeWithDefaults(data);
     }
     try{localStorage.setItem(STORAGE_KEY,JSON.stringify(db));}catch(ex){}
     _lastHash = JSON.stringify(db);
+    hideLoading(); document.getElementById('fb-setup').style.display='none';
     onDataReady();
     startPolling();
-
   }catch(e){
-    // Firebase failed — fall back to localStorage silently
-    console.warn('[WorkTrackr] Firebase unavailable:',e.message);
-    if(localDb){
-      db = localDb;
-      hideLoading(); document.getElementById('fb-setup').style.display='none';
-      onDataReady();
-      // Retry Firebase in background
-      setTimeout(function(){ _retryFirebase(); }, 5000);
-      return;
-    }
-    // No cache either - start fresh locally
+    console.warn('[WorkTrackr] Firebase unavailable on first load:',e.message);
     db = JSON.parse(JSON.stringify(DEFAULT_DB));
     try{localStorage.setItem(STORAGE_KEY,JSON.stringify(db));}catch(e3){}
     hideLoading(); document.getElementById('fb-setup').style.display='none';
     onDataReady();
     setTimeout(function(){ _retryFirebase(); }, 5000);
+  }
+}
+
+// Background Firebase sync — called after app is already shown from cache
+async function _syncFromFirebaseBackground(){
+  if(!gasUrl) return;
+  try{
+    var data = await fbRead();
+    if(!data) return;
+    var cloudDb = mergeWithDefaults(data);
+    var cloudScore = (cloudDb.managers||[]).length + (cloudDb.employees||[]).length + (cloudDb.tasks||[]).length;
+    var localScore = (db.managers||[]).length + (db.employees||[]).length + (db.tasks||[]).length;
+    if(cloudScore > localScore){
+      // Cloud has more data — update db and localStorage
+      db = cloudDb;
+      try{localStorage.setItem(STORAGE_KEY,JSON.stringify(db));}catch(ex){}
+      _lastHash = JSON.stringify(db);
+      console.log('[WorkTrackr] Background sync: cloud data merged');
+    } else if(cloudScore < localScore || !_hasRealData(data)){
+      // Local is richer — push back to cloud
+      await fbWrite(db);
+      console.log('[WorkTrackr] Background sync: pushed local data to cloud');
+    }
+    _lastHash = JSON.stringify(db);
+    startPolling();
+  }catch(e){
+    console.warn('[WorkTrackr] Background Firebase sync failed:',e.message);
+    setTimeout(function(){ _retryFirebase(); }, 8000);
   }
 }
 
@@ -2270,7 +2274,17 @@ function atab(t){
   if(t==='forgot')showFpStep(1);
   if(t==='manager-setup')checkExistingMgr();
 }
-function aerr(m){const e=document.getElementById('auth-err');e.textContent=m;e.style.display='block';}
+function aerr(m){
+  const e=document.getElementById('auth-err');
+  e.style.display='block';
+  e.style.whiteSpace='pre-line';
+  if(m.startsWith('⛔')){
+    e.style.cssText='display:block;background:#fef2f2;color:#991b1b;border:2px solid #fca5a5;border-radius:10px;padding:13px 15px;font-size:13px;line-height:1.7;white-space:pre-line;font-weight:500;';
+  } else {
+    e.style.cssText='display:block;background:#fef2f2;color:#dc2626;border:1.5px solid #fca5a5;border-radius:9px;padding:11px 14px;font-size:13px;white-space:pre-line;';
+  }
+  e.textContent=m;
+}
 function aclear(){document.getElementById('auth-err').style.display='none';}
 function togpw(id,el){const i=document.getElementById(id);if(!i)return;i.type=i.type==='password'?'text':'password';el.textContent=i.type==='password'?'👁':'🙈';el.title=i.type==='password'?'Show password':'Hide password';}
 function pwstr(inp){_pwBar(inp,'pwbar','pwhint');}
@@ -2320,23 +2334,18 @@ async function doLogin(){
   if(!uid.includes('@')){aerr('Please enter a valid email address.');return;}
   if(!pw){aerr('Please enter your password.');return;}
 
-  // Pull fresh data from Firebase before authenticating
-  if(gasUrl){
+  // Attempt a quick Firebase refresh (non-blocking, 3s max)
+  if(gasUrl && !_hasRealData(db)){
     const loginBtn = document.querySelector('#f-login .btn-p');
-    if(loginBtn){ loginBtn.textContent='Syncing...'; loginBtn.disabled=true; }
+    if(loginBtn){ loginBtn.textContent='Loading...'; loginBtn.disabled=true; }
     try{
-      const data = await fbRead();
+      const quickFetch = new Promise((_res,_rej)=>setTimeout(()=>_rej(new Error('quick timeout')),3000));
+      const data = await Promise.race([fbRead(), quickFetch]);
       if(data && _hasRealData(data)){
-        const incoming = mergeWithDefaults(data);
-        // Only accept if cloud data is at least as rich as what we have locally
-        const curScore = (db.managers||[]).length + (db.employees||[]).length;
-        const newScore = (incoming.managers||[]).length + (incoming.employees||[]).length;
-        if(newScore >= curScore){
-          db = incoming;
-          try{localStorage.setItem(STORAGE_KEY,JSON.stringify(db));}catch(e){}
-        }
+        db = mergeWithDefaults(data);
+        try{localStorage.setItem(STORAGE_KEY,JSON.stringify(db));}catch(e){}
       }
-    }catch(e){ console.warn('Pre-login sync failed, using cached data',e); }
+    }catch(e){ console.warn('Pre-login quick sync skipped:',e.message); }
     if(loginBtn){ loginBtn.textContent='Sign In →'; loginBtn.disabled=false; }
   }
 
@@ -2411,8 +2420,8 @@ function regStep1(){
   if(!mgrEmail.includes('@')){aerr('Please enter a valid manager email address.');return;}
   if(pw.length<6){aerr('Password must be at least 6 characters.');return;}
   if(pw!==conf){aerr('Passwords do not match.');return;}
-  if(db.managers.find(m=>m.userId===uid)){aerr('That email is already registered as a manager.');return;}
-  if(db.employees.find(e=>e.userId===uid)||db.pendingRegs.find(r=>r.userId===uid)){aerr('An account with this email already exists.');return;}
+  if(db.managers.find(m=>m.userId.toLowerCase()===uid)){aerr('⛔ This email is already registered as a manager account. Please sign in instead.');return;}
+  if(db.employees.find(e=>e.userId.toLowerCase()===uid)||db.pendingRegs.find(r=>r.userId.toLowerCase()===uid)){aerr('⛔ An account with this email already exists. Each email can only be used for one account.');return;}
   // Find manager by email
   const mgr=db.managers.find(m=>{
     const e1=(m.email||'').toLowerCase().trim();
@@ -2586,13 +2595,7 @@ function backToLogin(){document.getElementById('pending-screen').style.display='
 // ── MANAGER SETUP ──
 const ADMIN_SETUP_CODE = 'ADMIN2024';
 
-function checkExistingMgr(){
-  const warn=document.getElementById('mgr-setup-warn');
-  if(db.managers.length>0){
-    warn.style.display='block';
-    document.getElementById('existing-mgr-id').textContent=db.managers.map(m=>m.email||m.userId).join(', ');
-  } else {warn.style.display='none';}
-}
+function checkExistingMgr(){ /* warning removed */ }
 
 function mgrSetupBack(){
   document.getElementById('mgr-setup-step1').style.display='block';
@@ -2615,8 +2618,12 @@ function createManagerDirect(){
   if(phone.length!==10||isNaN(Number(phone))){aerr('Please enter a valid 10-digit mobile number.');return;}
   if(!pw||pw.length<6){aerr('Password must be at least 6 characters.');return;}
   if(pw!==conf){aerr('Passwords do not match.');return;}
-  if(db.managers.find(m=>m.userId===email)){aerr('A manager with this email already exists. Please sign in.');return;}
-  if(db.employees.find(e=>e.userId===email)){aerr('An employee account with this email already exists.');return;}
+  if(db.managers.find(m=>m.userId.toLowerCase()===email)){
+    aerr('⛔ This email is already registered as a manager account.\n\nYou cannot create two accounts with the same email. Please sign in instead.');return;
+  }
+  if(db.employees.find(e=>e.userId.toLowerCase()===email)){
+    aerr('⛔ This email is already registered as an employee account.\n\nEach email can only be used for one account. Please use a different email.');return;
+  }
   if(db.managers.find(m=>m.phone===phone)){aerr('This mobile number is already registered to a manager.');return;}
 
   // Resolve link by email (optional)
@@ -2915,7 +2922,11 @@ function renderTasks(){
     ];
     filtersHtml=mgrFilters.map(f=>`<button class="fb ${tFilter===f.key?'on':''}" onclick="setF('${f.key}')">${f.label}</button>`).join('');
     // Employee filter dropdown
-    const myEmps=db.employees.filter(e=>(e.managerIds||[e.managerId||'']).includes(CU.id));
+    const _cuId=String(CU.id);
+  const myEmps=db.employees.filter(e=>{
+    const ids=(e.managerIds||(e.managerId!=null?[e.managerId]:[])).map(String);
+    return ids.includes(_cuId);
+  });
     filtersHtml+=`<select class="search-inp" id="emp-filter-sel" style="width:180px;cursor:pointer;margin-left:4px;" onchange="tEmpFilter=this.value;renderTasks()">
       <option value="all">👥 All Employees</option>
       ${myEmps.map(e=>`<option value="${e.id}" ${String(tEmpFilter)===String(e.id)?'selected':''}>${e.name}</option>`).join('')}
@@ -3482,7 +3493,7 @@ function markAllRead(){db.notifications.forEach(n=>n.read=true);renderNotifs();u
 // APPROVALS
 // ═══════════════════════════════════════════════════
 function renderApprovals(){
-  const myRegs=db.pendingRegs.filter(r=>(r.managerIds||[r.managerId||'']).includes(CU.id));
+  const myRegs=db.pendingRegs.filter(r=>{const _i=(r.managerIds||(r.managerId!=null?[r.managerId]:[])).map(String);return _i.includes(String(CU.id));});
   const rel=document.getElementById('reg-appr-list');
   if(!myRegs.length){
     rel.innerHTML=emptyH('No Pending Link Requests','No account link requests for your team yet.');
@@ -3632,7 +3643,7 @@ function unlinkManager(mid){
 // ═══════════════════════════════════════════════════
 function renderEmployees(){
   const tb=document.getElementById('emp-tb');
-  const myEmps=db.employees.filter(e=>(e.managerIds||[e.managerId||'']).includes(CU.id));
+  const myEmps=db.employees.filter(e=>{const _i=(e.managerIds||(e.managerId!=null?[e.managerId]:[])).map(String);return _i.includes(String(CU.id));});
   if(!myEmps.length){tb.innerHTML=`<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:28px;">No team members yet.</td></tr>`;return;}
   tb.innerHTML=myEmps.map(e=>{
     const et=db.tasks.filter(t=>String(t.assignedTo)===String(e.id)&&t.managerId===CU.id);
@@ -3680,11 +3691,19 @@ function addEmployee(){
   if(!pw)    { toast('Please set a password for this employee.','err'); return; }
   if(pw.length < 6){ toast('Password must be at least 6 characters.','err'); return; }
   if(pw !== conf)  { toast('Passwords do not match.','err'); return; }
-  if(db.managers.find(m=>m.userId===uid)){ toast('A manager account with this email already exists.','err'); return; }
-  if(db.employees.find(e=>e.userId===uid)||db.pendingRegs.find(r=>r.userId===uid)){ toast('An account with this email already exists.','err'); return; }
-  const mgr = myMgr();
+  if(db.managers.find(m=>m.userId.toLowerCase()===uid)){ toast('⛔ This email is already a manager account — cannot use it for an employee.','err'); return; }
+  if(db.employees.find(e=>e.userId.toLowerCase()===uid)||db.pendingRegs.find(r=>r.userId.toLowerCase()===uid)){ toast('⛔ An account with this email already exists. Each email can only be used once.','err'); return; }
+  // Find the actual manager record and ensure nextEid is a valid number
+  const mgr = db.managers.find(m=>m.id===CU.id) || myMgr();
+  if(!mgr){ toast('Manager account not found. Please log out and log in again.','err'); return; }
+  if(typeof mgr.nextEid !== 'number' || isNaN(mgr.nextEid)){
+    // Recalculate from existing employees to avoid ID collisions
+    const maxId = db.employees.reduce((mx,e)=>Math.max(mx, typeof e.id==='number'?e.id:0), 0);
+    mgr.nextEid = maxId + 1;
+  }
+  const newEmpId = mgr.nextEid++;
   db.employees.push({
-    id: mgr.nextEid++,
+    id: newEmpId,
     name,
     role: role||'Employee',
     userId: uid,
@@ -3692,6 +3711,7 @@ function addEmployee(){
     password: pw,
     phone: phone||'',
     managerIds: [CU.id],
+    managerId: CU.id,
     joinDate: new Date().toISOString().slice(0,10)
   });
   ['e-name','e-email','e-pw','e-pw-conf','e-phone'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
@@ -3774,13 +3794,23 @@ function renderMetrics(){
       <div class="reason-count">${cnt}x</div>
     </div>`).join(''):'<div style="color:var(--muted);font-size:13px;">No blocked tasks yet.</div>';
 
-  // By employee
+  // By employee — only this manager's team
   const bel=document.getElementById('met-by-emp');
-  bel.innerHTML=db.employees.map(e=>{
-    const et=tasks.filter(t=>t.assignedTo===e.id);
-    const ep=et.length?Math.round(et.filter(t=>t.status==='complete').length/et.length*100):0;
-    return `<div style="margin-bottom:10px;"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;"><span>${e.name}</span><span style="color:var(--green);font-weight:600">${ep}%</span></div><div class="bar-wrap"><div class="bar-fill" style="width:${ep}%;background:var(--green)"></div></div></div>`;
-  }).join('');
+  const _mId=String(CU.id);
+  const myEmpsMet=db.employees.filter(e=>{
+    const ids=(e.managerIds||(e.managerId!=null?[e.managerId]:[])).map(String);
+    return ids.includes(_mId);
+  });
+  const myTasksMet=tasks.filter(t=>t.managerId===CU.id);
+  if(!myEmpsMet.length){
+    bel.innerHTML='<div style="color:var(--muted);font-size:13px;padding:8px 0;">No team members yet. Add employees from the Team Members tab.</div>';
+  } else {
+    bel.innerHTML=myEmpsMet.map(e=>{
+      const et=myTasksMet.filter(t=>String(t.assignedTo)===String(e.id));
+      const ep=et.length?Math.round(et.filter(t=>t.status==='complete').length/et.length*100):0;
+      return `<div style="margin-bottom:10px;"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;"><span>${e.name}</span><span style="color:var(--green);font-weight:600">${ep}%</span></div><div class="bar-wrap"><div class="bar-fill" style="width:${ep}%;background:var(--green)"></div></div></div>`;
+    }).join('');
+  }
 }
 
 // ═══════════════════════════════════════════════════
@@ -4194,7 +4224,7 @@ function updBadges(){
   const unread=myNotifs().filter(n=>!n.read).length;
   const nb=document.getElementById('b-notif');nb.style.display=unread?'inline':'none';nb.textContent=unread;
   if(CU.role==='manager'){
-    const pa=db.pendingRegs.filter(r=>(r.managerIds||[r.managerId||'']).includes(CU.id)).length+db.pendingTransfers.length;
+    const pa=db.pendingRegs.filter(r=>{const _i=(r.managerIds||(r.managerId!=null?[r.managerId]:[])).map(String);return _i.includes(String(CU.id));}).length+db.pendingTransfers.length;
     const ab=document.getElementById('b-appr');ab.style.display=pa?'inline':'none';ab.textContent=pa;
   }
 }
@@ -4282,7 +4312,7 @@ function openAddRecurring(){
   document.getElementById('r-due-offset').value='7';
   document.getElementById('r-edit-id').value='';
   // Populate employees
-  const myEmps=db.employees.filter(e=>(e.managerIds||[e.managerId||'']).includes(CU.id));
+  const myEmps=db.employees.filter(e=>{const _i=(e.managerIds||(e.managerId!=null?[e.managerId]:[])).map(String);return _i.includes(String(CU.id));});
   document.getElementById('r-emp').innerHTML='<option value="">Select team member...</option>'+myEmps.map(e=>`<option value="${e.id}">${e.name}</option>`).join('');
   // Tags
   const tagSel=document.getElementById('r-tags-sel');
@@ -4307,7 +4337,7 @@ function editRecurring(rid){
   document.getElementById('r-pri').value=r.priority||'medium';
   document.getElementById('r-edit-id').value=rid;
   // Employees
-  const myEmps=db.employees.filter(e=>(e.managerIds||[e.managerId||'']).includes(CU.id));
+  const myEmps=db.employees.filter(e=>{const _i=(e.managerIds||(e.managerId!=null?[e.managerId]:[])).map(String);return _i.includes(String(CU.id));});
   document.getElementById('r-emp').innerHTML='<option value="">Select team member...</option>'+myEmps.map(e=>`<option value="${e.id}" ${String(e.id)===String(r.assignedTo)?'selected':''}>${e.name}</option>`).join('');
   // Tags
   const tagSel=document.getElementById('r-tags-sel');
@@ -4712,7 +4742,11 @@ function respondLeave(status){
 // ═══════════════════════════════════════════════════
 function renderWorkload(){
   const el=document.getElementById('workload-content');
-  const myEmps=db.employees.filter(e=>(e.managerIds||[e.managerId||'']).includes(CU.id));
+  const _wlId=String(CU.id);
+  const myEmps=db.employees.filter(e=>{
+    const ids=(e.managerIds||(e.managerId!=null?[e.managerId]:[])).map(String);
+    return ids.includes(_wlId);
+  });
   if(!myEmps.length){el.innerHTML=emptyH('No team members','Add team members to see workload distribution.');return;}
 
   const tasks=myTasks().filter(t=>t.status!=='complete');
@@ -4925,7 +4959,7 @@ function renderSalary(){
   ].map(t=>`<button class="fb ${salaryTab===t.key?'on':''}" onclick="salaryTab='${t.key}';renderSalary()">${t.label}</button>`).join('');
 
   const el = document.getElementById('salary-content');
-  const myEmps = db.employees.filter(e=>(e.managerIds||[]).includes(CU.id));
+  const myEmps = db.employees.filter(e=>{const _i=(e.managerIds||(e.managerId!=null?[e.managerId]:[])).map(String);return _i.includes(String(CU.id));});
 
   if(salaryTab==='config'){
     if(!myEmps.length){ el.innerHTML=emptyH('No team members','Add team members to configure salaries.'); return; }
@@ -5128,7 +5162,7 @@ function calcPayslipForEmp(emp, month){
 function previewPayslips(){
   const month = document.getElementById('gp-month').value;
   if(!month){ toast('Please select a month.','err'); return; }
-  const myEmps = db.employees.filter(e=>(e.managerIds||[]).includes(CU.id));
+  const myEmps = db.employees.filter(e=>{const _i=(e.managerIds||(e.managerId!=null?[e.managerId]:[])).map(String);return _i.includes(String(CU.id));});
   const configured = myEmps.filter(e=>getSalaryConfig(e.id));
   const notConfigured = myEmps.filter(e=>!getSalaryConfig(e.id));
   const previews = configured.map(e=>calcPayslipForEmp(e,month)).filter(Boolean);
@@ -5782,7 +5816,7 @@ function checkIn(){
 
   // GPS / source check
   const ciBtn=document.getElementById('att-checkin-btn');
-  if(ciBtn){ ciBtn.disabled=true; ciBtn.textContent='📡 Checking location...'; }
+  if(ciBtn){ ciBtn.disabled=true; ciBtn.innerHTML='<span style="font-size:18px;">📡</span> Checking...'; }
 
   _gpsCheckLocation(CU.empId).then(gps=>{
     const time = nowTime();
@@ -5812,7 +5846,7 @@ function checkIn(){
     renderAttendance();
   }).catch(errMsg=>{
     toast(errMsg,'err');
-    if(ciBtn){ ciBtn.disabled=false; ciBtn.innerHTML='🟢 Login'; }
+    if(ciBtn){ ciBtn.disabled=false; ciBtn.innerHTML='<span style="font-size:22px;">🟢</span> Mark Attendance'; }
   });
 }
 
@@ -5824,7 +5858,7 @@ function checkOut(){
   if(rec.checkOut){ toast('You have already logged out today at '+rec.checkOut,'warn'); return; }
 
   const coBtn=document.getElementById('att-checkout-btn');
-  if(coBtn){ coBtn.disabled=true; coBtn.textContent='📡 Checking location...'; }
+  if(coBtn){ coBtn.disabled=true; coBtn.innerHTML='<span style="font-size:18px;">📡</span> Checking...'; }
 
   _gpsCheckLocation(CU.empId).then(gps=>{
     const time = nowTime();
@@ -5841,7 +5875,7 @@ function checkOut(){
     renderAttendance();
   }).catch(errMsg=>{
     toast(errMsg,'err');
-    if(coBtn){ coBtn.disabled=false; coBtn.innerHTML='🔴 Logout'; }
+    if(coBtn){ coBtn.disabled=false; coBtn.innerHTML='<span style="font-size:22px;">🔴</span> Mark Exit'; }
   });
 }
 
@@ -5911,7 +5945,7 @@ function renderAttendance(){
     ? 'Attendance <small>Team login/logout records</small>'
     : 'My Attendance <small>Your daily login &amp; logout time</small>';
 
-  // Month filter — last 3 months
+  // Month filter
   const monthSel = document.getElementById('att-month-filter');
   const months = [];
   for(let i=0;i<3;i++){
@@ -5923,340 +5957,321 @@ function renderAttendance(){
   }
   const selMonth = monthSel.value || months[0].val;
 
-  // Employee filter (manager only)
+  if(isMgr){
+    _renderMgr(selMonth);
+  } else {
+    _renderEmp(selMonth);
+  }
+}
+
+/* ── Manager path ── */
+function _renderMgr(selMonth){
   const empFilterEl = document.getElementById('att-emp-filter');
   const empThEl     = document.getElementById('att-th-emp');
-  if(isMgr){
-    empFilterEl.style.display='block';
-    if(empThEl) empThEl.style.display='';
-    // Show source filter for managers
-    const srcFilterEl=document.getElementById('att-source-filter');
-    if(srcFilterEl) srcFilterEl.style.display='block';
-    const myEmps = db.employees.filter(e=>(e.managerIds||[e.managerId]).includes(CU.id));
-    empFilterEl.innerHTML = '<option value="all">👥 All Employees</option>' +
-      myEmps.map(e=>`<option value="${e.id}">${e.name}</option>`).join('');
-    document.getElementById('att-today-card').style.display='none';
-    document.getElementById('att-device-banner').style.display='none';
-    // Show sub-tab bar for managers
-    const _attTabsEl=document.getElementById('att-tabs'); if(_attTabsEl) _attTabsEl.style.display='flex';
-    if(_attTab==='today'){
-      const _tp=document.getElementById('att-today-panel'); if(_tp) _tp.style.display='block';
-      const _st=document.getElementById('att-stats'); if(_st) _st.style.display='none';
-      renderTodayAttendance();
-    } else {
-      const _tp=document.getElementById('att-today-panel'); if(_tp) _tp.style.display='none';
-    }
-  } else {
-    empFilterEl.style.display='none';
-    if(empThEl) empThEl.style.display='none';
-    const srcFilterEl2=document.getElementById('att-source-filter');
-    if(srcFilterEl2) srcFilterEl2.style.display='none';
-    const _eAttTabsEl=document.getElementById('att-tabs'); if(_eAttTabsEl) _eAttTabsEl.style.display='none';
-    const _eTodayPanelEl=document.getElementById('att-today-panel'); if(_eTodayPanelEl) _eTodayPanelEl.style.display='none';
-    const _eStatsEl=document.getElementById('att-stats'); if(_eStatsEl) _eStatsEl.style.display='grid';
+  empFilterEl.style.display='block';
+  if(empThEl) empThEl.style.display='';
+  const srcFilterEl = document.getElementById('att-source-filter');
+  if(srcFilterEl) srcFilterEl.style.display='block';
 
-    // GPS banner
-    _renderGpsBanner();
+  const myEmps = db.employees.filter(e=>{const ids=(e.managerIds||(e.managerId!=null?[e.managerId]:[])).map(String);return ids.includes(String(CU.id));});
+  empFilterEl.innerHTML = '<option value="all">👥 All Employees</option>' +
+    myEmps.map(e=>`<option value="${e.id}">${e.name}</option>`).join('');
 
-    // Device banner — IP-based PC lock
-    const banner = document.getElementById('att-device-banner');
-    const registeredIp = getRegisteredIp(CU.empId);
-    const mobile = isMobileDevice();
+  // hide employee today-card
+  document.getElementById('att-today-card').style.display='none';
+  document.getElementById('att-device-banner').style.display='none';
 
-    if(mobile){
-      // Mobile: device banner not shown — GPS handles it
-      banner.style.display='none';
-    } else if(!registeredIp){
-      // PC not registered yet
-      banner.style.display='block';
-      banner.innerHTML=`<strong>🖥️ Register This PC</strong> — Your PC's IP address must be registered before you can mark attendance from a computer.<br><br>
-        <button onclick="registerDevice()" style="background:var(--blue);color:#fff;border:none;padding:8px 20px;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;font-family:'Poppins',sans-serif;">✅ Register This PC</button>`;
-      // Hide check-in buttons until registered
-      const _ciB=document.getElementById('att-checkin-btn');
-      const _coB=document.getElementById('att-checkout-btn');
-      if(_ciB) _ciB.style.display='none';
-      if(_coB) _coB.style.display='none';
-      const _stEl=document.getElementById('att-punch-status');
-      if(_stEl) _stEl.textContent='Register this PC to record attendance.';
-      const _ntEl=document.getElementById('att-today-note');
-      if(_ntEl) _ntEl.textContent='';
-    } else {
-      // PC registered — verify IP async
-      banner.style.display='block';
-      banner.style.cssText='display:block;background:#f0f9ff;border:1px solid #bae6fd;border-radius:12px;padding:14px 18px;margin-bottom:18px;font-size:13px;color:#0369a1;';
-      banner.innerHTML=`<strong>🔄 Verifying your PC...</strong> Checking your IP address against registered PC.`;
-      const _ciB=document.getElementById('att-checkin-btn');
-      const _coB=document.getElementById('att-checkout-btn');
-      if(_ciB) _ciB.style.display='none';
-      if(_coB) _coB.style.display='none';
+  // sub-tabs
+  const attTabsEl = document.getElementById('att-tabs');
+  if(attTabsEl) attTabsEl.style.display='flex';
 
-      getDeviceIp().then(currentIp=>{
-        if(!currentIp){
-          banner.style.cssText='display:block;background:var(--orange-l);border:1px solid var(--orange);border-radius:12px;padding:14px 18px;margin-bottom:18px;font-size:13px;';
-          banner.innerHTML=`<strong>⚠️ IP Check Failed</strong> — Could not verify your PC's IP address. Check your internet connection.<br><small style="color:var(--muted);">Registered PC IP: ${registeredIp}</small>`;
-          return;
-        }
-        if(currentIp===registeredIp){
-          // Match — show green badge and enable buttons
-          banner.style.cssText='display:block;background:#f0fdf4;border:1.5px solid #34d399;border-radius:12px;padding:11px 18px;margin-bottom:18px;font-size:13px;color:#065f46;';
-          banner.innerHTML=`✅ <strong>Registered PC</strong> — IP: <code style="background:#d1fae5;padding:1px 6px;border-radius:4px;">${currentIp}</code> &nbsp;·&nbsp; ${getDeviceName()}
-            <button onclick="registerDevice()" style="margin-left:12px;background:transparent;color:#059669;border:1px solid #34d399;padding:3px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;">🔄 Re-register</button>`;
-          // Re-render attendance to show correct button states
-          const rec2 = getTodayRecord(CU.empId);
-          const ciBtn2=document.getElementById('att-checkin-btn');
-          const coBtn2=document.getElementById('att-checkout-btn');
-          const stEl2=document.getElementById('att-punch-status');
-          const ntEl2=document.getElementById('att-today-note');
-          if(!rec2||!rec2.checkIn){
-            if(ciBtn2){ ciBtn2.style.display='flex'; ciBtn2.disabled=false; ciBtn2.innerHTML='🟢 Login'; }
-            if(coBtn2) coBtn2.style.display='none';
-            if(stEl2) stEl2.innerHTML='<span style="color:var(--orange);font-weight:600;">⏳ Not checked in yet</span>';
-            if(ntEl2) ntEl2.textContent='Click Login when you start work.';
-          } else if(rec2.checkIn&&!rec2.checkOut){
-            if(ciBtn2) ciBtn2.style.display='none';
-            if(coBtn2){ coBtn2.style.display='flex'; coBtn2.disabled=false; coBtn2.innerHTML='🔴 Logout'; }
-            if(stEl2) stEl2.innerHTML=`<span style="color:var(--green);font-weight:600;">🟢 Logged in at ${rec2.checkIn}</span>`;
-            if(ntEl2) ntEl2.textContent='Click Logout before you leave.';
-          } else {
-            if(ciBtn2) ciBtn2.style.display='none';
-            if(coBtn2) coBtn2.style.display='none';
-            const dur2=calcDuration(rec2.checkIn,rec2.checkOut);
-            if(stEl2) stEl2.innerHTML=`<span style="color:var(--blue);font-weight:600;">✅ Day complete — Total hours: ${dur2}</span>`;
-            if(ntEl2) ntEl2.textContent='Have a great rest of your day!';
-          }
-        } else {
-          // IP mismatch — block
-          banner.style.cssText='display:block;background:#fff1f2;border:1.5px solid #fca5a5;border-radius:12px;padding:14px 18px;margin-bottom:18px;font-size:13px;';
-          banner.innerHTML=`<strong>⛔ Unregistered PC</strong> — Attendance can only be marked from your registered PC.<br>
-            <div style="margin-top:8px;font-size:12px;color:#7f1d1d;">
-              Registered IP: <code style="background:#fee2e2;padding:1px 6px;border-radius:4px;">${registeredIp}</code><br>
-              Your current IP: <code style="background:#fee2e2;padding:1px 6px;border-radius:4px;">${currentIp}</code>
-            </div>
-            <div style="margin-top:8px;font-size:11px;color:#991b1b;">To switch your registered PC, contact your manager or re-register from the correct PC.</div>`;
-          const _ciB2=document.getElementById('att-checkin-btn');
-          const _coB2=document.getElementById('att-checkout-btn');
-          if(_ciB2) _ciB2.style.display='none';
-          if(_coB2) _coB2.style.display='none';
-          const _stEl2=document.getElementById('att-punch-status');
-          if(_stEl2) _stEl2.innerHTML='<span style="color:var(--red);font-weight:600;">⛔ PC not authorised</span>';
-        }
-      });
-      // While IP is being fetched — don't show check-in buttons yet
-      return;
-    }
-
-    // Today card display for non-IP-blocked path (mobile — GPS handles auth)
-    const todayCard = document.getElementById('att-today-card');
-    todayCard.style.display='block';
-    document.getElementById('att-today-date').textContent =
-      new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-
-    const rec = getTodayRecord(CU.empId);
-    const ciEl  = document.getElementById('att-ci-time');
-    const coEl  = document.getElementById('att-co-time');
-    const durEl = document.getElementById('att-duration');
-    const noteEl= document.getElementById('att-today-note');
-    const ciBtn = document.getElementById('att-checkin-btn');
-    const coBtn = document.getElementById('att-checkout-btn');
-    const statusEl = document.getElementById('att-punch-status');
-
-    ciEl.textContent  = rec?.checkIn  || '—';
-    coEl.textContent  = rec?.checkOut || '—';
-    durEl.textContent = rec ? calcDuration(rec.checkIn, rec.checkOut) : '—';
-
-    if(!rec || !rec.checkIn){
-      ciBtn.style.display='flex'; coBtn.style.display='none';
-      statusEl.innerHTML='<span style="color:var(--orange);font-weight:600;">⏳ Not checked in yet</span>';
-      noteEl.textContent='Click Login when you start work.';
-    } else if(rec.checkIn && !rec.checkOut){
-      ciBtn.style.display='none'; coBtn.style.display='flex';
-      statusEl.innerHTML=`<span style="color:var(--green);font-weight:600;">🟢 Logged in at ${rec.checkIn}</span>`;
-      noteEl.textContent='Click Logout before you leave.';
-    } else {
-      ciBtn.style.display='none'; coBtn.style.display='none';
-      const dur = calcDuration(rec.checkIn, rec.checkOut);
-      statusEl.innerHTML=`<span style="color:var(--blue);font-weight:600;">✅ Day complete — Total hours: ${dur}</span>`;
-      noteEl.textContent='Have a great rest of your day!';
-    }
-
-    // Start live clock
-    startLiveClock();
+  if(_attTab==='today'){
+    const tp=document.getElementById('att-today-panel'); if(tp) tp.style.display='block';
+    const st=document.getElementById('att-stats');       if(st) st.style.display='none';
+    const body =document.getElementById('att-body');     if(body) body.innerHTML='';
+    const empty=document.getElementById('att-empty');    if(empty) empty.style.display='none';
+    renderTodayAttendance();
+    return; // nothing else needed for 'today' tab
   }
 
-  // Filter records
+  // Records tab
+  const tp=document.getElementById('att-today-panel'); if(tp) tp.style.display='none';
+  const st=document.getElementById('att-stats');       if(st) st.style.display='grid';
+
   let records = db.attendance.filter(r=>r.date.startsWith(selMonth));
-  if(isMgr){
-    const myEmpIds = db.employees.filter(e=>(e.managerIds||[e.managerId]).includes(CU.id)).map(e=>e.id);
-    records = records.filter(r=>myEmpIds.includes(r.empId)||myEmpIds.includes(Number(r.empId)));
-    const empSel = empFilterEl.value;
-    if(empSel!=='all') records = records.filter(r=>String(r.empId)===String(empSel));
-    // Source filter
-    const srcSel = document.getElementById('att-source-filter')?.value||'all';
-    if(srcSel!=='all') records = records.filter(r=>(r.source||'pc')===srcSel);
-  } else {
-    records = records.filter(r=>r.empId==CU.empId);
-  }
+  const myEmpIds = myEmps.map(e=>e.id);
+  records = records.filter(r=>myEmpIds.includes(r.empId)||myEmpIds.includes(Number(r.empId)));
+  const empSel = empFilterEl.value;
+  if(empSel!=='all') records = records.filter(r=>String(r.empId)===String(empSel));
+  const srcSel = document.getElementById('att-source-filter')?.value||'all';
+  if(srcSel!=='all') records = records.filter(r=>(r.source||'pc')===srcSel);
 
-  // Stats — only render aggregate stats here if NOT filtering to a specific employee
   const [yr,mo] = selMonth.split('-').map(Number);
   const daysInMonth = new Date(yr,mo,0).getDate();
   const today = new Date();
   const daysElapsed = (yr===today.getFullYear()&&mo===today.getMonth()+1)?today.getDate():daysInMonth;
 
-  const empSelForStats = isMgr ? empFilterEl.value : null;
-  if(!isMgr || empSelForStats === 'all'){
-    // Aggregate stats (all employees or employee's own view)
-    const workdays = countWorkdays(yr,mo,daysElapsed,CU.id);
-    const present = isMgr
-      ? [...new Set(records.map(r=>r.empId+'|'+r.date))].length
-      : records.filter(r=>r.checkIn).length;
-    const durations = records.filter(r=>r.checkIn&&r.checkOut).map(r=>{
-      const d=calcDuration(r.checkIn,r.checkOut); if(d==='—') return 0;
-      const m=d.match(/(\d+)h\s+(\d+)m/); return m ? parseInt(m[1])*60+parseInt(m[2]) : 0;
-    }).filter(x=>x>0);
-    const avgMins = durations.length ? Math.round(durations.reduce((a,b)=>a+b,0)/durations.length) : 0;
-    const avgDur = avgMins ? Math.floor(avgMins/60)+'h '+( avgMins%60)+'m' : '—';
-    document.getElementById('att-stats').innerHTML=`
-      <div class="sc s3"><div class="sl">Present Days</div><div class="sv c3" style="font-size:28px;font-weight:800;">${present}</div></div>
-      <div class="sc s1"><div class="sl">${isMgr?'Employees Tracked':'Absent Days'}</div><div class="sv c1" style="font-size:28px;font-weight:800;">${isMgr?[...new Set(records.map(r=>r.empId))].length:Math.max(0,workdays-present)}</div></div>
-      <div class="sc s2"><div class="sl">Working Days</div><div class="sv c2" style="font-size:28px;font-weight:800;">${workdays}</div></div>
-      <div class="sc s4"><div class="sl">${isMgr?'Month':'Avg Duration'}</div><div class="sv c4" style="font-size:${isMgr?'16':'22'}px;font-weight:800;">${isMgr?new Date(yr,mo-1).toLocaleString([],{month:'long',year:'numeric'}):avgDur}</div></div>
-    `;
-  }
-
-  // Table
   const body  = document.getElementById('att-body');
   const empty = document.getElementById('att-empty');
 
-  if(isMgr){
-    const empSel = empFilterEl.value;
-    if(empSel !== 'all'){
-      // ── EMPLOYEE-SPECIFIC CALENDAR VIEW (same as employee's own view) ──
-      const selEmp = db.employees.find(e=>String(e.id)===String(empSel));
-      const empMgrForPolicy = selEmp ? (selEmp.managerIds?.[0]||selEmp.managerId||CU.id) : CU.id;
-      const rows = [];
-      for(let day=1;day<=daysInMonth;day++){
-        const dateStr = `${selMonth}-${String(day).padStart(2,'0')}`;
-        const dt = new Date(dateStr+'T12:00:00');
-        const dayName = dt.toLocaleDateString([],{weekday:'short'});
-        const rec = records.find(r=>r.date===dateStr);
-        const isFuture = dt > today && dateStr !== todayStr();
-        const dateStatus = getDateStatus(dateStr, empMgrForPolicy);
-        // Check if on leave that day
-        const onLeave = (db.leaves||[]).find(l=>
-          String(l.empId)===String(empSel) && l.status==='approved' &&
-          l.from<=dateStr && l.to>=dateStr
-        );
-        let statusHtml, ciTxt='—', coTxt='—', durTxt='—';
-        if(rec){ ciTxt=rec.checkIn||'—'; coTxt=rec.checkOut||'—'; durTxt=calcDuration(rec.checkIn,rec.checkOut); }
-        if(isFuture)                            statusHtml='<span style="color:var(--muted);font-size:12px;">—</span>';
-        else if(dateStatus?.type==='holiday')   statusHtml=`<span class="att-holiday">🎉 ${dateStatus.label}</span>`;
-        else if(dateStatus?.type==='weekend')   statusHtml=`<span class="att-holiday">${dateStatus.label}</span>`;
-        else if(dateStatus?.type==='halfday')   statusHtml='<span class="att-holiday">½ Saturday</span>';
-        else if(onLeave && rec?.checkIn)        statusHtml='<span style="background:#fef3c7;color:#d97706;font-weight:700;font-size:11px;padding:3px 10px;border-radius:20px;">⚠ On Leave+In</span>';
-        else if(onLeave)                        {const cfg=LEAVE_CONFIG[onLeave.type]||LEAVE_CONFIG.other; statusHtml=`<span style="background:${cfg.color}22;color:${cfg.color};font-weight:700;font-size:11px;padding:3px 10px;border-radius:20px;">${cfg.icon} On Leave</span>`;}
-        else if(rec?.checkIn&&rec?.checkOut)    statusHtml='<span class="att-present">Complete</span>';
-        else if(rec?.checkIn)                   statusHtml='<span style="background:#fef3c7;color:#d97706;font-weight:700;font-size:11px;padding:3px 10px;border-radius:20px;">In Office</span>';
-        else                                    statusHtml='<span class="att-absent">Absent</span>';
-        rows.push(`<tr class="att-row">
-          <td><strong>${dateStr}</strong></td>
-          <td style="color:var(--muted);">${dayName}</td>
-          <td style="font-weight:700;color:var(--green);">${ciTxt}</td>
-          <td style="font-weight:700;color:var(--red);">${coTxt}</td>
-          <td style="font-weight:600;color:var(--blue);">${durTxt}</td>
-          <td>${rec ? sourceBadge(rec.source||'pc', rec.lat, rec.lng) : '<span style="color:var(--muted);font-size:11px;">—</span>'}</td>
-          <td>${statusHtml}</td>
-        </tr>`);
-      }
-      // Stats for selected employee
-      const empWorkdays = countWorkdays(yr,mo,daysElapsed,empMgrForPolicy);
-      const empPresent  = records.filter(r=>r.checkIn).length;
-      const empLeaveDays = (db.leaves||[]).filter(l=>
-        String(l.empId)===String(empSel) && l.status==='approved' &&
-        l.from.startsWith(selMonth) || l.to.startsWith(selMonth)
-      ).reduce((sum,l)=>sum+(l.days||0),0);
-      const empDurs = records.filter(r=>r.checkIn&&r.checkOut).map(r=>{
-        const d=calcDuration(r.checkIn,r.checkOut); if(d==='—') return 0;
-        const m=d.match(/(\d+)h\s+(\d+)m/); return m ? parseInt(m[1])*60+parseInt(m[2]) : 0;
-      }).filter(x=>x>0);
-      const empAvgMins = empDurs.length ? Math.round(empDurs.reduce((a,b)=>a+b,0)/empDurs.length) : 0;
-      const empAvgDur  = empAvgMins ? Math.floor(empAvgMins/60)+'h '+(empAvgMins%60)+'m' : '—';
-      document.getElementById('att-stats').innerHTML=`
-        <div class="sc" style="grid-column:1/-1;background:linear-gradient(135deg,#e8eeff,#f0f4ff);border:1.5px solid #c7d2fe;border-radius:14px;padding:12px 16px;display:flex;align-items:center;gap:12px;">
-          <div class="av e" style="width:36px;height:36px;font-size:15px;flex-shrink:0;">${(selEmp?.name||'?')[0].toUpperCase()}</div>
-          <div><div style="font-weight:800;font-size:14px;">${selEmp?.name||'Employee'}</div><div style="font-size:11px;color:var(--muted);">${selEmp?.role||''} · ${new Date(yr,mo-1).toLocaleString([],{month:'long',year:'numeric'})}</div></div>
-        </div>
-        <div class="sc s3"><div class="sl">Present Days</div><div class="sv c3" style="font-size:28px;font-weight:800;">${empPresent}</div></div>
-        <div class="sc s1"><div class="sl">Absent Days</div><div class="sv c1" style="font-size:28px;font-weight:800;">${Math.max(0,empWorkdays-empPresent)}</div></div>
-        <div class="sc s2"><div class="sl">Working Days</div><div class="sv c2" style="font-size:28px;font-weight:800;">${empWorkdays}</div></div>
-        <div class="sc s4"><div class="sl">Avg Duration</div><div class="sv c4" style="font-size:22px;font-weight:800;">${empAvgDur}</div></div>
-      `;
-      // Swap employee column header for calendar view
-      if(empThEl) empThEl.style.display='none';
-      empty.style.display='none';
-      body.innerHTML = rows.reverse().join('');
-    } else {
-      // ── AGGREGATE VIEW for all employees ──
-      if(empThEl) empThEl.style.display='';
-      const sorted = [...records].sort((a,b)=>(b.checkInTs||b.date).localeCompare(a.checkInTs||a.date));
-      if(!sorted.length){ body.innerHTML=''; empty.style.display='block'; return; }
-      empty.style.display='none';
-      body.innerHTML = sorted.map(r=>{
-        const dur = calcDuration(r.checkIn, r.checkOut);
-        const dateStatus = getDateStatus(r.date, CU.id);
-        let statusHtml;
-        if(dateStatus?.type==='holiday')        statusHtml=`<span class="att-holiday">🎉 ${dateStatus.label}</span>`;
-        else if(r.checkIn&&r.checkOut)          statusHtml='<span class="att-present">Complete</span>';
-        else if(r.checkIn)                      statusHtml='<span style="background:#fef3c7;color:#d97706;font-weight:700;font-size:11px;padding:3px 10px;border-radius:20px;">In Office</span>';
-        else                                    statusHtml='<span class="att-absent">Absent</span>';
-        return `<tr class="att-row">
-          <td><strong>${r.date}</strong></td>
-          <td style="font-weight:600;">${r.empName||'—'}</td>
-          <td style="color:var(--muted);">${new Date(r.date+'T12:00:00').toLocaleDateString([],{weekday:'short'})}</td>
-          <td style="font-weight:700;color:var(--green);">${r.checkIn||'—'}</td>
-          <td style="font-weight:700;color:var(--red);">${r.checkOut||'—'}</td>
-          <td style="font-weight:600;color:var(--blue);">${dur}</td>
-          <td>${sourceBadge(r.source||'pc', r.lat, r.lng)}</td>
-          <td>${statusHtml}</td>
-        </tr>`;
-      }).join('');
-    }
+  if(empSel==='all'){
+    // Aggregate stats
+    const workdays = countWorkdays(yr,mo,daysElapsed,CU.id);
+    const present  = [...new Set(records.map(r=>r.empId+'|'+r.date))].length;
+    document.getElementById('att-stats').innerHTML=`
+      <div class="sc s3"><div class="sl">Present Days</div><div class="sv c3" style="font-size:28px;font-weight:800;">${present}</div></div>
+      <div class="sc s1"><div class="sl">Employees Tracked</div><div class="sv c1" style="font-size:28px;font-weight:800;">${[...new Set(records.map(r=>r.empId))].length}</div></div>
+      <div class="sc s2"><div class="sl">Working Days</div><div class="sv c2" style="font-size:28px;font-weight:800;">${workdays}</div></div>
+      <div class="sc s4"><div class="sl">Month</div><div class="sv c4" style="font-size:16px;font-weight:800;">${new Date(yr,mo-1).toLocaleString([],{month:'long',year:'numeric'})}</div></div>`;
+    if(empThEl) empThEl.style.display='';
+    if(!records.length){ body.innerHTML=''; empty.style.display='block'; return; }
+    empty.style.display='none';
+    body.innerHTML = [...records].sort((a,b)=>(b.date).localeCompare(a.date)).map(r=>{
+      const dur = calcDuration(r.checkIn,r.checkOut);
+      const ds  = getDateStatus(r.date,CU.id);
+      let sh = ds?.type==='holiday'?`<span class="att-holiday">🎉 ${ds.label}</span>`:
+               r.checkIn&&r.checkOut?'<span class="att-present">Complete</span>':
+               r.checkIn?'<span style="background:#fef3c7;color:#d97706;font-weight:700;font-size:11px;padding:3px 10px;border-radius:20px;">In Office</span>':
+               '<span class="att-absent">Absent</span>';
+      return `<tr class="att-row">
+        <td><strong>${r.date}</strong></td>
+        <td style="font-weight:600;">${r.empName||'—'}</td>
+        <td style="color:var(--muted);">${new Date(r.date+'T12:00:00').toLocaleDateString([],{weekday:'short'})}</td>
+        <td style="font-weight:700;color:var(--green);">${r.checkIn||'—'}</td>
+        <td style="font-weight:700;color:var(--red);">${r.checkOut||'—'}</td>
+        <td style="font-weight:600;color:var(--blue);">${dur}</td>
+        <td>${sourceBadge(r.source||'pc',r.lat,r.lng)}</td>
+        <td>${sh}</td></tr>`;
+    }).join('');
   } else {
-    // Employee: show every calendar day
-    const rows = [];
+    // Per-employee calendar
+    const selEmp = db.employees.find(e=>String(e.id)===String(empSel));
+    const empMgrForPolicy = selEmp?(selEmp.managerIds?.[0]||selEmp.managerId||CU.id):CU.id;
+    if(empThEl) empThEl.style.display='none';
+    const rows=[];
     for(let day=1;day<=daysInMonth;day++){
-      const dateStr = `${selMonth}-${String(day).padStart(2,'0')}`;
-      const dt = new Date(dateStr+'T12:00:00');
-      const dayName = dt.toLocaleDateString([],{weekday:'short'});
-      const isWeekend = dt.getDay()===0||dt.getDay()===6;
-      const rec = records.find(r=>r.date===dateStr);
-      const isFuture = dt > today && dateStr !== todayStr();
-      // Get date status from manager's work policy
-      const empMgrId = CU.managerId||(CU.managerIds?CU.managerIds[0]:null)||'';
-      const dateStatus = getDateStatus(dateStr, empMgrId);
-      let statusHtml, ciTxt='—', coTxt='—', durTxt='—';
-      if(rec){ ciTxt=rec.checkIn||'—'; coTxt=rec.checkOut||'—'; durTxt=calcDuration(rec.checkIn,rec.checkOut); }
-      if(isFuture)                            statusHtml='<span style="color:var(--muted);font-size:12px;">—</span>';
-      else if(dateStatus?.type==='holiday')   statusHtml=`<span class="att-holiday">🎉 ${dateStatus.label}</span>`;
-      else if(dateStatus?.type==='weekend')   statusHtml=`<span class="att-holiday">${dateStatus.label}</span>`;
-      else if(dateStatus?.type==='halfday')   statusHtml='<span class="att-holiday">½ Saturday</span>';
-      else if(rec?.checkIn&&rec?.checkOut)    statusHtml='<span class="att-present">Complete</span>';
-      else if(rec?.checkIn)                   statusHtml='<span style="background:#fef3c7;color:#d97706;font-weight:700;font-size:11px;padding:3px 10px;border-radius:20px;">In Office</span>';
-      else                                    statusHtml='<span class="att-absent">Absent</span>';
-      rows.push(`<tr class="att-row">
-        <td><strong>${dateStr}</strong></td>
-        <td style="color:var(--muted);">${dayName}</td>
-        <td style="font-weight:700;color:var(--green);">${ciTxt}</td>
-        <td style="font-weight:700;color:var(--red);">${coTxt}</td>
-        <td style="font-weight:600;color:var(--blue);">${durTxt}</td>
-        <td>${rec ? sourceBadge(rec.source||'pc', rec.lat, rec.lng) : '<span style="color:var(--muted);font-size:11px;">—</span>'}</td>
-        <td>${statusHtml}</td>
-      </tr>`);
+      const dateStr=`${selMonth}-${String(day).padStart(2,'0')}`;
+      const dt=new Date(dateStr+'T12:00:00');
+      const dayName=dt.toLocaleDateString([],{weekday:'short'});
+      const rec=records.find(r=>r.date===dateStr);
+      const isFuture=dt>today&&dateStr!==todayStr();
+      const ds=getDateStatus(dateStr,empMgrForPolicy);
+      const onLeave=(db.leaves||[]).find(l=>String(l.empId)===String(empSel)&&l.status==='approved'&&l.from<=dateStr&&l.to>=dateStr);
+      let sh,ci='—',co='—',dur='—';
+      if(rec){ci=rec.checkIn||'—';co=rec.checkOut||'—';dur=calcDuration(rec.checkIn,rec.checkOut);}
+      if(isFuture)                           sh='<span style="color:var(--muted);font-size:12px;">—</span>';
+      else if(ds?.type==='holiday')          sh=`<span class="att-holiday">🎉 ${ds.label}</span>`;
+      else if(ds?.type==='weekend')          sh=`<span class="att-holiday">${ds.label}</span>`;
+      else if(ds?.type==='halfday')          sh='<span class="att-holiday">½ Saturday</span>';
+      else if(onLeave&&rec?.checkIn)         sh='<span style="background:#fef3c7;color:#d97706;font-weight:700;font-size:11px;padding:3px 10px;border-radius:20px;">⚠ On Leave+In</span>';
+      else if(onLeave)                       {const cfg=LEAVE_CONFIG[onLeave.type]||LEAVE_CONFIG.other;sh=`<span style="background:${cfg.color}22;color:${cfg.color};font-weight:700;font-size:11px;padding:3px 10px;border-radius:20px;">${cfg.icon} On Leave</span>`;}
+      else if(rec?.checkIn&&rec?.checkOut)   sh='<span class="att-present">Complete</span>';
+      else if(rec?.checkIn)                  sh='<span style="background:#fef3c7;color:#d97706;font-weight:700;font-size:11px;padding:3px 10px;border-radius:20px;">In Office</span>';
+      else                                   sh='<span class="att-absent">Absent</span>';
+      rows.push(`<tr class="att-row"><td><strong>${dateStr}</strong></td><td style="color:var(--muted);">${dayName}</td>
+        <td style="font-weight:700;color:var(--green);">${ci}</td><td style="font-weight:700;color:var(--red);">${co}</td>
+        <td style="font-weight:600;color:var(--blue);">${dur}</td>
+        <td>${rec?sourceBadge(rec.source||'pc',rec.lat,rec.lng):'<span style="color:var(--muted);font-size:11px;">—</span>'}</td>
+        <td>${sh}</td></tr>`);
     }
+    // Stats for selected employee
+    const empWorkdays=countWorkdays(yr,mo,daysElapsed,empMgrForPolicy);
+    const empPresent=records.filter(r=>r.checkIn).length;
+    const empDurs=records.filter(r=>r.checkIn&&r.checkOut).map(r=>{const d=calcDuration(r.checkIn,r.checkOut);if(d==='—')return 0;const m=d.match(/(\d+)h\s+(\d+)m/);return m?parseInt(m[1])*60+parseInt(m[2]):0;}).filter(x=>x>0);
+    const empAvgMins=empDurs.length?Math.round(empDurs.reduce((a,b)=>a+b,0)/empDurs.length):0;
+    const empAvgDur=empAvgMins?Math.floor(empAvgMins/60)+'h '+(empAvgMins%60)+'m':'—';
+    document.getElementById('att-stats').innerHTML=`
+      <div class="sc" style="grid-column:1/-1;background:linear-gradient(135deg,#e8eeff,#f0f4ff);border:1.5px solid #c7d2fe;border-radius:14px;padding:12px 16px;display:flex;align-items:center;gap:12px;">
+        <div class="av e" style="width:36px;height:36px;font-size:15px;flex-shrink:0;">${(selEmp?.name||'?')[0].toUpperCase()}</div>
+        <div><div style="font-weight:800;font-size:14px;">${selEmp?.name||'Employee'}</div><div style="font-size:11px;color:var(--muted);">${selEmp?.role||''} · ${new Date(yr,mo-1).toLocaleString([],{month:'long',year:'numeric'})}</div></div>
+      </div>
+      <div class="sc s3"><div class="sl">Present Days</div><div class="sv c3" style="font-size:28px;font-weight:800;">${empPresent}</div></div>
+      <div class="sc s1"><div class="sl">Absent Days</div><div class="sv c1" style="font-size:28px;font-weight:800;">${Math.max(0,empWorkdays-empPresent)}</div></div>
+      <div class="sc s2"><div class="sl">Working Days</div><div class="sv c2" style="font-size:28px;font-weight:800;">${empWorkdays}</div></div>
+      <div class="sc s4"><div class="sl">Avg Duration</div><div class="sv c4" style="font-size:22px;font-weight:800;">${empAvgDur}</div></div>`;
     empty.style.display='none';
     body.innerHTML = rows.reverse().join('');
   }
 }
+
+/* ── Employee path ── */
+function _renderEmp(selMonth){
+  const empFilterEl = document.getElementById('att-emp-filter');
+  const empThEl     = document.getElementById('att-th-emp');
+  empFilterEl.style.display='none';
+  if(empThEl) empThEl.style.display='none';
+  const srcFilterEl = document.getElementById('att-source-filter');
+  if(srcFilterEl) srcFilterEl.style.display='none';
+  const attTabsEl = document.getElementById('att-tabs');
+  if(attTabsEl) attTabsEl.style.display='none';
+  const todayPanelEl = document.getElementById('att-today-panel');
+  if(todayPanelEl) todayPanelEl.style.display='none';
+  const statsEl = document.getElementById('att-stats');
+  if(statsEl) statsEl.style.display='grid';
+
+  // GPS banner
+  _renderGpsBanner();
+
+  // Today card — show always, then update buttons based on IP/GPS result
+  const todayCard = document.getElementById('att-today-card');
+  todayCard.style.display='block';
+  document.getElementById('att-today-date').textContent =
+    new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+
+  const rec    = getTodayRecord(CU.empId);
+  const ciEl   = document.getElementById('att-ci-time');
+  const coEl   = document.getElementById('att-co-time');
+  const durEl  = document.getElementById('att-duration');
+  const noteEl = document.getElementById('att-today-note');
+  const ciBtn  = document.getElementById('att-checkin-btn');
+  const coBtn  = document.getElementById('att-checkout-btn');
+  const statusEl = document.getElementById('att-punch-status');
+
+  ciEl.textContent  = rec?.checkIn  || '—';
+  coEl.textContent  = rec?.checkOut || '—';
+  durEl.textContent = rec ? calcDuration(rec.checkIn, rec.checkOut) : '—';
+
+  const registeredIp = getRegisteredIp(CU.empId);
+  const mobile = isMobileDevice();
+  const banner = document.getElementById('att-device-banner');
+
+  if(mobile){
+    // Mobile — GPS handles auth, show buttons immediately
+    banner.style.display='none';
+    _setAttButtons(rec, ciBtn, coBtn, statusEl, noteEl);
+  } else if(!registeredIp){
+    // PC not registered — show register prompt, hide buttons
+    banner.style.display='block';
+    banner.innerHTML=`<strong>🖥️ Register This PC</strong> — Your PC must be registered before marking attendance from a computer.<br><br>
+      <button onclick="registerDevice()" style="background:var(--blue);color:#fff;border:none;padding:8px 20px;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;font-family:'Poppins',sans-serif;">✅ Register This PC</button>`;
+    ciBtn.style.display='none'; coBtn.style.display='none';
+    if(statusEl) statusEl.textContent='Register this PC to enable attendance.';
+    if(noteEl)   noteEl.textContent='';
+  } else {
+    // PC registered — show "verifying" then reveal buttons after IP resolves
+    banner.style.cssText='display:block;background:#f0f9ff;border:1px solid #bae6fd;border-radius:12px;padding:14px 18px;margin-bottom:18px;font-size:13px;color:#0369a1;';
+    banner.innerHTML='<strong>🔄 Verifying your PC...</strong> Checking IP address.';
+    ciBtn.style.display='none'; coBtn.style.display='none';
+    if(statusEl) statusEl.innerHTML='<span style="color:var(--muted);">Verifying PC...</span>';
+
+    // Snapshot rec at this point — async callback uses it
+    const recSnap = getTodayRecord(CU.empId);
+    getDeviceIp().then(currentIp=>{
+      if(!currentIp){
+        banner.style.cssText='display:block;background:var(--orange-l);border:1px solid var(--orange);border-radius:12px;padding:14px 18px;margin-bottom:18px;font-size:13px;';
+        banner.innerHTML=`<strong>⚠️ IP Check Failed</strong> — Could not verify your PC IP.<br><small style="color:var(--muted);">Registered: ${registeredIp}</small>`;
+        // Still allow attendance on IP check failure (network issue, not fraud)
+        _setAttButtons(recSnap,
+          document.getElementById('att-checkin-btn'),
+          document.getElementById('att-checkout-btn'),
+          document.getElementById('att-punch-status'),
+          document.getElementById('att-today-note'));
+        return;
+      }
+      if(currentIp===registeredIp){
+        banner.style.cssText='display:block;background:#f0fdf4;border:1.5px solid #34d399;border-radius:12px;padding:11px 18px;margin-bottom:18px;font-size:13px;color:#065f46;';
+        banner.innerHTML=`✅ <strong>Registered PC</strong> — <code style="background:#d1fae5;padding:1px 6px;border-radius:4px;">${currentIp}</code> &nbsp;·&nbsp; ${getDeviceName()}
+          <button onclick="registerDevice()" style="margin-left:12px;background:transparent;color:#059669;border:1px solid #34d399;padding:3px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;">🔄 Re-register</button>`;
+        _setAttButtons(recSnap,
+          document.getElementById('att-checkin-btn'),
+          document.getElementById('att-checkout-btn'),
+          document.getElementById('att-punch-status'),
+          document.getElementById('att-today-note'));
+      } else {
+        banner.style.cssText='display:block;background:#fff1f2;border:1.5px solid #fca5a5;border-radius:12px;padding:14px 18px;margin-bottom:18px;font-size:13px;';
+        banner.innerHTML=`<strong>⛔ Unregistered PC</strong> — Use your registered PC to mark attendance.<br>
+          <div style="margin-top:8px;font-size:12px;color:#7f1d1d;">Registered: <code style="background:#fee2e2;padding:1px 6px;border-radius:4px;">${registeredIp}</code> · Yours: <code style="background:#fee2e2;padding:1px 6px;border-radius:4px;">${currentIp}</code></div>`;
+        const ci2=document.getElementById('att-checkin-btn'),co2=document.getElementById('att-checkout-btn'),st2=document.getElementById('att-punch-status');
+        if(ci2) ci2.style.display='none'; if(co2) co2.style.display='none';
+        if(st2) st2.innerHTML='<span style="color:var(--red);font-weight:600;">⛔ PC not authorised</span>';
+      }
+    }).catch(()=>{
+      // Network error during IP check — allow attendance
+      banner.style.cssText='display:block;background:var(--orange-l);border:1px solid var(--orange);border-radius:12px;padding:14px 18px;margin-bottom:18px;font-size:13px;';
+      banner.innerHTML='<strong>⚠️ Could not verify IP</strong> — Attendance allowed.';
+      _setAttButtons(recSnap,
+        document.getElementById('att-checkin-btn'),
+        document.getElementById('att-checkout-btn'),
+        document.getElementById('att-punch-status'),
+        document.getElementById('att-today-note'));
+    });
+    // Fall through — table renders immediately below
+  }
+
+  startLiveClock();
+
+  // ── Monthly records table (always renders) ──
+  const [yr,mo] = selMonth.split('-').map(Number);
+  const daysInMonth = new Date(yr,mo,0).getDate();
+  const today = new Date();
+  const daysElapsed = (yr===today.getFullYear()&&mo===today.getMonth()+1)?today.getDate():daysInMonth;
+  const workdays = countWorkdays(yr,mo,daysElapsed,CU.managerId||(CU.managerIds?CU.managerIds[0]:null)||'');
+
+  const records = db.attendance.filter(r=>r.date.startsWith(selMonth)&&r.empId==CU.empId);
+  const present = records.filter(r=>r.checkIn).length;
+  const durations = records.filter(r=>r.checkIn&&r.checkOut).map(r=>{
+    const d=calcDuration(r.checkIn,r.checkOut); if(d==='—') return 0;
+    const m=d.match(/(\d+)h\s+(\d+)m/); return m?parseInt(m[1])*60+parseInt(m[2]):0;
+  }).filter(x=>x>0);
+  const avgMins = durations.length?Math.round(durations.reduce((a,b)=>a+b,0)/durations.length):0;
+  const avgDur  = avgMins?Math.floor(avgMins/60)+'h '+(avgMins%60)+'m':'—';
+  document.getElementById('att-stats').innerHTML=`
+    <div class="sc s3"><div class="sl">Present Days</div><div class="sv c3" style="font-size:28px;font-weight:800;">${present}</div></div>
+    <div class="sc s1"><div class="sl">Absent Days</div><div class="sv c1" style="font-size:28px;font-weight:800;">${Math.max(0,workdays-present)}</div></div>
+    <div class="sc s2"><div class="sl">Working Days</div><div class="sv c2" style="font-size:28px;font-weight:800;">${workdays}</div></div>
+    <div class="sc s4"><div class="sl">Avg Duration</div><div class="sv c4" style="font-size:22px;font-weight:800;">${avgDur}</div></div>`;
+
+  const empMgrId = CU.managerId||(CU.managerIds?CU.managerIds[0]:null)||'';
+  const body  = document.getElementById('att-body');
+  const empty = document.getElementById('att-empty');
+  const rows  = [];
+  for(let day=1;day<=daysInMonth;day++){
+    const dateStr=`${selMonth}-${String(day).padStart(2,'0')}`;
+    const dt=new Date(dateStr+'T12:00:00');
+    const dayName=dt.toLocaleDateString([],{weekday:'short'});
+    const rec2=records.find(r=>r.date===dateStr);
+    const isFuture=dt>today&&dateStr!==todayStr();
+    const ds=getDateStatus(dateStr,empMgrId);
+    let sh,ci='—',co='—',dur2='—';
+    if(rec2){ci=rec2.checkIn||'—';co=rec2.checkOut||'—';dur2=calcDuration(rec2.checkIn,rec2.checkOut);}
+    if(isFuture)                           sh='<span style="color:var(--muted);font-size:12px;">—</span>';
+    else if(ds?.type==='holiday')          sh=`<span class="att-holiday">🎉 ${ds.label}</span>`;
+    else if(ds?.type==='weekend')          sh=`<span class="att-holiday">${ds.label}</span>`;
+    else if(ds?.type==='halfday')          sh='<span class="att-holiday">½ Saturday</span>';
+    else if(rec2?.checkIn&&rec2?.checkOut) sh='<span class="att-present">Complete</span>';
+    else if(rec2?.checkIn)                 sh='<span style="background:#fef3c7;color:#d97706;font-weight:700;font-size:11px;padding:3px 10px;border-radius:20px;">In Office</span>';
+    else                                   sh='<span class="att-absent">Absent</span>';
+    rows.push(`<tr class="att-row"><td><strong>${dateStr}</strong></td><td style="color:var(--muted);">${dayName}</td>
+      <td style="font-weight:700;color:var(--green);">${ci}</td><td style="font-weight:700;color:var(--red);">${co}</td>
+      <td style="font-weight:600;color:var(--blue);">${dur2}</td>
+      <td>${rec2?sourceBadge(rec2.source||'pc',rec2.lat,rec2.lng):'<span style="color:var(--muted);font-size:11px;">—</span>'}</td>
+      <td>${sh}</td></tr>`);
+  }
+  empty.style.display='none';
+  body.innerHTML = rows.reverse().join('');
+}
+
+/* helper: set login/logout button state */
+function _setAttButtons(rec, ciBtn, coBtn, statusEl, noteEl){
+  if(!rec||!rec.checkIn){
+    if(ciBtn){ciBtn.style.display='flex';ciBtn.disabled=false;ciBtn.innerHTML='<span style="font-size:22px;">🟢</span> Mark Attendance';}
+    if(coBtn) coBtn.style.display='none';
+    if(statusEl) statusEl.innerHTML='Not marked yet';
+    if(noteEl)   noteEl.textContent='Tap the button when you start work.';
+  } else if(rec.checkIn&&!rec.checkOut){
+    if(ciBtn) ciBtn.style.display='none';
+    if(coBtn){coBtn.style.display='flex';coBtn.disabled=false;coBtn.innerHTML='<span style="font-size:22px;">🔴</span> Mark Exit';}
+    if(statusEl) statusEl.innerHTML=`Logged in at ${rec.checkIn}`;
+    if(noteEl)   noteEl.textContent='Tap Mark Exit before you leave.';
+  } else {
+    if(ciBtn) ciBtn.style.display='none';
+    if(coBtn) coBtn.style.display='none';
+    const dur=calcDuration(rec.checkIn,rec.checkOut);
+    if(statusEl) statusEl.innerHTML=`✅ Day complete · ${dur}`;
+    if(noteEl)   noteEl.textContent='Have a great rest of your day!';
+  }
+}
+
 function exportAttendance(){
   if(!CU) return;
   const isMgr=CU.role==='manager';
@@ -6264,7 +6279,7 @@ function exportAttendance(){
   db.attendance=db.attendance||[];
   let records=db.attendance.filter(r=>r.date.startsWith(monthSel));
   if(isMgr){
-    const myEmpIds=db.employees.filter(e=>(e.managerIds||[e.managerId]).includes(CU.id)).map(e=>e.id);
+    const myEmpIds=db.employees.filter(e=>{const ids=(e.managerIds||(e.managerId!=null?[e.managerId]:[])).map(String);return ids.includes(String(CU.id));}).map(e=>e.id);
     records=records.filter(r=>myEmpIds.includes(r.empId)||myEmpIds.includes(Number(r.empId)));
   } else {
     records=records.filter(r=>r.empId==CU.empId);
@@ -6514,7 +6529,7 @@ function openExportTasksModal(){
 
   // Populate employee dropdown
   const empSel = document.getElementById('exp-emp');
-  const myEmps = db.employees.filter(e=>(e.managerIds||[e.managerId||'']).includes(CU.id));
+  const myEmps = db.employees.filter(e=>{const _i=(e.managerIds||(e.managerId!=null?[e.managerId]:[])).map(String);return _i.includes(String(CU.id));});
   empSel.innerHTML = '<option value="all">All Employees</option>';
   myEmps.forEach(e=>{ empSel.innerHTML += `<option value="${e.id}">${e.name}</option>`; });
 
@@ -6626,11 +6641,29 @@ function doExportTasksCSV(){
 // employee sees employee features
 // =====================================================
 
-const APP_VERSION = '2.6.0'; // Bump this string every update
+const APP_VERSION = '2.7.0'; // Bump this string every update
 const VERSION_KEY = 'worktrackr_seen_version_'; // + userId
 
 // Full changelog — each version lists changes by role
 const CHANGELOG = [
+  {
+    version: '2.7.0',
+    date: 'March 2026',
+    title: 'What's New in WorkTrackr',
+    manager: [
+      { icon: '🔗', text: 'Manager accounts now link via email — no setup code needed. Share your registered email with other managers to link workspaces.' },
+      { icon: '🌿', text: 'Leave management simplified — all leave types now go directly to you for approval. No automatic limits per month.' },
+      { icon: '✅', text: 'Attendance redesigned — employees see a cleaner Mark Attendance / Mark Exit interface with live clock and time summary.' },
+      { icon: '🖥️', text: 'Attendance fixed for all browsers — the records table and today card now always load correctly.' },
+      { icon: '🔄', text: 'Edge browser fix — accounts now sync across tabs and profiles automatically.' },
+    ],
+    employee: [
+      { icon: '✅', text: 'New attendance interface — tap the big green "Mark Attendance" button to log in and red "Mark Exit" to log out.' },
+      { icon: '🌿', text: 'Leave applications — apply for any leave type, any duration. Your manager will approve or reject each request.' },
+      { icon: '🔄', text: 'Edge browser fix — your account now works correctly across different browser windows.' },
+    ]
+  },
+[
   {
     version: '2.6.0',
     date: 'March 2026',
@@ -6921,7 +6954,7 @@ function renderPersonView(){
   if(!pv || CU.role!=='manager') return;
 
   const allTasks  = db.tasks.filter(t=>t.managerId===CU.id);
-  const myEmps    = db.employees.filter(e=>(e.managerIds||[e.managerId||'']).includes(CU.id));
+  const myEmps    = db.employees.filter(e=>{const _i=(e.managerIds||(e.managerId!=null?[e.managerId]:[])).map(String);return _i.includes(String(CU.id));});
 
   const STATUS_ORDER = ['todo','inprogress','blocked','review','complete'];
   const STATUS_COLOR = {
@@ -7096,7 +7129,7 @@ function renderJobRoles(){
 
 function _countEmpWithRole(roleName){
   return db.employees.filter(e=>
-    (e.managerIds||[e.managerId]).includes(CU.id) && e.role===roleName
+    (e.managerIds||(e.managerId!=null?[e.managerId]:[])).map(String).includes(String(CU.id)) && e.role===roleName
   ).length;
 }
 
@@ -7135,7 +7168,7 @@ function saveRoleEdit(i){
   if(!mgr?.jobRoles) return;
   const oldName = mgr.jobRoles[i];
   // Update any employees using the old role name
-  db.employees.filter(e=>e.role===oldName && (e.managerIds||[e.managerId]).includes(CU.id))
+  db.employees.filter(e=>e.role===oldName && (e.managerIds||(e.managerId!=null?[e.managerId]:[])).map(String).includes(String(CU.id)))
     .forEach(e=>{ e.role=name; });
   mgr.jobRoles[i] = name;
   saveDB();
@@ -7468,7 +7501,7 @@ function switchAttTab(tab){
 function renderTodayAttendance(){
   if(!CU || CU.role!=='manager') return;
   const today = todayStr();
-  const myEmps = db.employees.filter(e=>(e.managerIds||[e.managerId]).includes(CU.id));
+  const myEmps = db.employees.filter(e=>{const ids=(e.managerIds||(e.managerId!=null?[e.managerId]:[])).map(String);return ids.includes(String(CU.id));});
   const records = (db.attendance||[]).filter(r=>r.date===today);
 
   const labelEl = document.getElementById('att-today-label');
