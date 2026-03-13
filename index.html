@@ -1853,49 +1853,70 @@ let _lastHash  = '';
 
 function getGasUrl(){ return localStorage.getItem(GAS_KEY)||FIREBASE_URL||null; }
 
-// ── Firebase REST helpers ──
-// Firebase Realtime DB exposes a REST API at:
-//   GET  {dbUrl}/worktrackr.json        → read all data
-//   PUT  {dbUrl}/worktrackr.json        → overwrite all data
-// These endpoints return proper CORS headers — work from any origin
+// ══════════════════════════════════════════════════════════
+// DATA LAYER — localStorage is the source of truth for UI.
+// Firebase is a backup/sync layer only. It never drives renders.
+// ══════════════════════════════════════════════════════════
 
 function fbEndpoint(){
   return gasUrl.replace(/\/+$/,'') + '/taskflow.json';
 }
 
-// Fetch with 12-second timeout using Promise.race (no AbortController)
-async function fbFetch(url, opts){
-  var timeoutPromise = new Promise(function(_,reject){
-    setTimeout(function(){ reject(new Error('Connection timed out (6s). Check: Firebase Rules published with read+write=true, and internet is working.')); }, 6000);
+async function fbFetch(url, opts, timeoutMs){
+  timeoutMs = timeoutMs || 8000;
+  return new Promise(function(resolve, reject){
+    var done = false;
+    var timer = setTimeout(function(){
+      if(done) return; done = true;
+      reject(new Error('Firebase timeout after '+timeoutMs+'ms'));
+    }, timeoutMs);
+    fetch(url, opts).then(function(r){
+      if(done) return; done = true;
+      clearTimeout(timer); resolve(r);
+    }).catch(function(e){
+      if(done) return; done = true;
+      clearTimeout(timer); reject(e);
+    });
   });
-  try{
-    var fetchPromise = fetch(url, opts);
-    var r = await Promise.race([fetchPromise, timeoutPromise]);
-    return r;
-  }catch(e){
-    if(e.message && e.message.indexOf('timed out')>=0) throw e;
-    throw new Error('Network error — '+e.message+'. Check your internet connection.');
-  }
 }
 
 async function fbRead(){
   var res = await fbFetch(fbEndpoint(), {method:'GET', headers:{'Accept':'application/json'}});
   if(!res.ok){
-    var txt = await res.text();
-    if(res.status===401||res.status===403) throw new Error('Permission denied ('+res.status+'). Go to Firebase > Realtime Database > Rules tab > set .read and .write to true > click Publish.');
-    if(res.status===404) throw new Error('Database not found (404). Check your URL ends in .firebaseio.com');
-    throw new Error('Firebase error '+res.status+': '+txt.substring(0,200));
+    var txt = await res.text().catch(function(){return '';});
+    if(res.status===401||res.status===403) throw new Error('Firebase permission denied. Set Rules to allow read+write and click Publish.');
+    if(res.status===404) throw new Error('Firebase database not found. Check URL.');
+    throw new Error('Firebase error '+res.status);
   }
-  return res.json();
+  var json = await res.json();
+  return json;
 }
 
 async function fbWrite(payload){
+  // Safety: never write empty/degraded data to Firebase
+  if(!_hasRealData(payload)){
+    console.warn('[WorkTrackr] fbWrite blocked — payload has no real data');
+    return;
+  }
   var res = await fbFetch(fbEndpoint(), {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
   if(!res.ok){
-    var txt = await res.text();
-    throw new Error('Save failed '+res.status+': '+txt.substring(0,100));
+    var txt = await res.text().catch(function(){return '';});
+    throw new Error('Firebase save failed '+res.status);
   }
-  return res.json();
+  return res.json().catch(function(){return null;});
+}
+
+// Safe merge: only accept incoming if it has >= accounts as current
+function _safeMerge(incoming){
+  if(!incoming || !_hasRealData(incoming)) return false;
+  var iDb = mergeWithDefaults(incoming);
+  var iAccounts = (iDb.managers||[]).length + (iDb.employees||[]).length;
+  var cAccounts = (db.managers||[]).length + (db.employees||[]).length;
+  if(iAccounts < cAccounts) return false; // never accept data loss
+  db = iDb;
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(db)); }catch(e){}
+  try{ if(CU) localStorage.setItem(STORAGE_KEY+'_session_backup', JSON.stringify(db)); }catch(e){}
+  return true;
 }
 
 // ── Connect button ──
@@ -1931,103 +1952,112 @@ function showErr(el, msg){
   el.textContent=msg;
 }
 
-// ── Load from Firebase (or localStorage fallback) ──
+// ══════════════════════════════════════════════════════════
+// STARTUP — Always from localStorage, Firebase is secondary
+// ══════════════════════════════════════════════════════════
 async function loadFromCloud(){
   showLoading('Loading WorkTrackr...');
 
-  // Always load localStorage cache first — show app immediately, never block on network
-  var localCached = localStorage.getItem(STORAGE_KEY);
-  var localDb = null;
-  if(localCached){
-    try{ localDb = mergeWithDefaults(JSON.parse(localCached)); }catch(ex){}
-  }
+  // ── Step 1: Load from localStorage immediately ──
+  var localDb = _loadLocalDb();
 
-  // CASE 1: No Firebase URL — run fully from localStorage
-  if(!gasUrl){
-    db = localDb || JSON.parse(JSON.stringify(DEFAULT_DB));
-    if(!localDb) try{localStorage.setItem(STORAGE_KEY,JSON.stringify(db));}catch(ex){}
-    hideLoading(); document.getElementById('fb-setup').style.display='none';
-    onDataReady(); return;
-  }
-
-  // CASE 2: Firebase URL exists
-  // Show the app immediately from cache so login is never blocked
+  // ── Step 2: Show app from localStorage ──
   if(localDb && _hasRealData(localDb)){
     db = localDb;
     hideLoading();
     document.getElementById('fb-setup').style.display='none';
     onDataReady();
-    // Sync with Firebase in background — update db silently if cloud is richer
-    _syncFromFirebaseBackground();
+    // Quietly sync Firebase in background — never blocks UI
+    if(gasUrl) setTimeout(function(){ _bgSync(); }, 2000);
     return;
   }
 
-  // No local cache — must wait for Firebase (first-time install)
+  // ── Step 3: No local data — try Firebase ──
+  if(!gasUrl){
+    // No Firebase either — fresh install, start empty
+    db = _freshDb();
+    _writeLocalDb(db);
+    hideLoading(); document.getElementById('fb-setup').style.display='none';
+    onDataReady(); return;
+  }
+
+  // Has Firebase URL but no local cache — must fetch
   try{
-    document.getElementById('fb-loading-txt').textContent='First time setup — connecting...';
+    document.getElementById('fb-loading-txt').textContent='Connecting to your workspace...';
     var data = await fbRead();
-    if(!data || !_hasRealData(data)){
-      db = JSON.parse(JSON.stringify(DEFAULT_DB));
-      await fbWrite(db);
-    } else {
+    if(data && _hasRealData(data)){
       db = mergeWithDefaults(data);
+    } else {
+      db = _freshDb();
+      await fbWrite(db).catch(function(){});
     }
-    try{localStorage.setItem(STORAGE_KEY,JSON.stringify(db));}catch(ex){}
+    _writeLocalDb(db);
     _lastHash = JSON.stringify(db);
     hideLoading(); document.getElementById('fb-setup').style.display='none';
     onDataReady();
     startPolling();
   }catch(e){
-    console.warn('[WorkTrackr] Firebase unavailable on first load:',e.message);
-    db = JSON.parse(JSON.stringify(DEFAULT_DB));
-    try{localStorage.setItem(STORAGE_KEY,JSON.stringify(db));}catch(e3){}
+    console.warn('[WorkTrackr] Firebase unavailable on startup:',e.message);
+    // Start with empty db — user can retry or register
+    db = _freshDb();
+    _writeLocalDb(db);
     hideLoading(); document.getElementById('fb-setup').style.display='none';
     onDataReady();
-    setTimeout(function(){ _retryFirebase(); }, 5000);
+    // Retry Firebase quietly after 8s
+    setTimeout(function(){ _bgSync(); }, 8000);
   }
 }
 
-// Background Firebase sync — called after app is already shown from cache
-async function _syncFromFirebaseBackground(){
-  if(!gasUrl) return;
+// ── Helpers ──
+function _loadLocalDb(){
+  // Try main key first, then session backup
+  var keys = [STORAGE_KEY, STORAGE_KEY+'_session_backup'];
+  for(var i=0;i<keys.length;i++){
+    try{
+      var raw = localStorage.getItem(keys[i]);
+      if(!raw) continue;
+      var parsed = JSON.parse(raw);
+      if(_hasRealData(parsed)) return mergeWithDefaults(parsed);
+    }catch(e){}
+  }
+  return null;
+}
+function _writeLocalDb(data){
+  if(!_hasRealData(data)) return; // never write empty data
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){}
+  if(CU) try{ localStorage.setItem(STORAGE_KEY+'_session_backup', JSON.stringify(data)); }catch(e){}
+}
+function _freshDb(){ return JSON.parse(JSON.stringify(DEFAULT_DB)); }
+
+// ── Background Firebase sync — NEVER touches the UI ──
+var _bgSyncRunning = false;
+async function _bgSync(){
+  if(!gasUrl || _bgSyncRunning) return;
+  _bgSyncRunning = true;
   try{
     var data = await fbRead();
-    // SAFETY: never accept data that has fewer accounts than what we have locally
     if(!data || !_hasRealData(data)){
-      // Firebase empty — push our local data up to cloud
-      await fbWrite(db);
-      console.log('[WorkTrackr] Background sync: pushed local data to empty cloud');
+      // Firebase empty — push local data up
+      await fbWrite(db).catch(function(){});
       _lastHash = JSON.stringify(db);
-      startPolling();
-      return;
-    }
-    var cloudDb = mergeWithDefaults(data);
-    var cloudAccounts = (cloudDb.managers||[]).length + (cloudDb.employees||[]).length;
-    var localAccounts = (db.managers||[]).length + (db.employees||[]).length;
-    // Only accept cloud data if it has at least as many accounts as local
-    if(cloudAccounts >= localAccounts){
-      var cloudScore = cloudAccounts + (cloudDb.tasks||[]).length;
-      var localScore = localAccounts + (db.tasks||[]).length;
-      if(cloudScore > localScore){
-        db = cloudDb;
-        try{localStorage.setItem(STORAGE_KEY,JSON.stringify(db));}catch(ex){}
-        console.log('[WorkTrackr] Background sync: merged richer cloud data');
-      } else if(cloudScore < localScore){
-        await fbWrite(db);
-        console.log('[WorkTrackr] Background sync: pushed richer local data to cloud');
-      }
     } else {
-      // Cloud has fewer accounts — local is authoritative, push up
-      await fbWrite(db);
-      console.log('[WorkTrackr] Background sync: local has more accounts, pushed to cloud');
+      var merged = _safeMerge(data);
+      if(!merged){
+        // Local is richer — push to Firebase
+        await fbWrite(db).catch(function(){});
+      }
+      _lastHash = JSON.stringify(db);
     }
-    _lastHash = JSON.stringify(db);
     startPolling();
   }catch(e){
-    console.warn('[WorkTrackr] Background Firebase sync failed:',e.message);
-    setTimeout(function(){ _retryFirebase(); }, 10000);
+    console.warn('[WorkTrackr] Background sync error:',e.message);
+  } finally {
+    _bgSyncRunning = false;
   }
 }
+
+// Alias for backward compat
+function _syncFromFirebaseBackground(){ return _bgSync(); }
 
 // Returns true if the data object has at least one real user (manager or employee)
 function _hasRealData(data){
@@ -2042,28 +2072,16 @@ async function _retryFirebase(){
   try{
     var data = await fbRead();
     if(data && _hasRealData(data)){
-      var incoming = mergeWithDefaults(data);
-      // Only accept if incoming has at least as many accounts as current
-      var curScore = (db.managers||[]).length + (db.employees||[]).length;
-      var newScore = (incoming.managers||[]).length + (incoming.employees||[]).length;
-      if(newScore >= curScore){
-        db = incoming;
-        try{localStorage.setItem(STORAGE_KEY,JSON.stringify(db));}catch(ex){}
-      }
-      // If current db is richer, push it to cloud
-      else { await fbWrite(db); }
-    } else if(!data){
-      // Firebase empty - push our current data up
-      await fbWrite(db);
+      _safeMerge(data); // safe — only accepts if not degraded
+    } else if(!data || !_hasRealData(data)){
+      await fbWrite(db).catch(function(){});
     }
-    _lastHash=JSON.stringify(db);
-    startPolling(); updFbStatus();
-    // Refresh current page with synced data
-    var pg=document.querySelector('.page.on');
-    if(pg) renderPage(pg.id.replace('page-',''));
-    toast('☁ Cloud sync connected!','ok');
+    _lastHash = JSON.stringify(db);
+    startPolling();
+    // Do NOT call renderPage here — it causes blank screens
+    // Just update badges silently
+    if(CU) updBadges();
   }catch(e){
-    // Still failing - try again in 30 seconds
     setTimeout(function(){ _retryFirebase(); }, 30000);
   }
 }
@@ -2076,57 +2094,43 @@ async function retryCloudLoad(){
 
 // ── Save (debounced 1s) ──
 function saveDB(){
-  try{
-    // SAFETY: never save an empty/degraded db — would wipe good localStorage data
-    if(!_hasRealData(db)){
-      console.warn('[WorkTrackr] saveDB blocked — db has no real data, skipping save');
-      return;
-    }
-    var serialized = JSON.stringify(db);
-    localStorage.setItem(STORAGE_KEY, serialized);
-    // Keep session backup fresh so recovery always has the latest good state
-    if(CU) localStorage.setItem(STORAGE_KEY+'_session_backup', serialized);
-  }catch(e){}
+  if(!_hasRealData(db)) return; // never overwrite good data with empty
+  _writeLocalDb(db);            // localStorage first — instant
   if(!gasUrl) return;
   clearTimeout(_saveTimer);
-  _saveTimer = setTimeout(function(){_pushToCloud();},1000);
+  _saveTimer = setTimeout(function(){ _pushToCloud(); }, 1500);
 }
 
 async function _pushToCloud(){
-  if(!gasUrl){_saveTimer=null;return;}
-  _saveTimer=null;
+  _saveTimer = null;
+  if(!gasUrl || !_hasRealData(db)) return;
   try{
     await fbWrite(db);
+    _lastHash = JSON.stringify(db);
   }catch(e){
-    console.warn('[WorkTrackr] Save failed, retry in 5s:',e.message);
-    setTimeout(function(){_pushToCloud();},5000);
+    console.warn('[WorkTrackr] Cloud save failed, retry in 8s');
+    setTimeout(function(){ _pushToCloud(); }, 8000);
   }
 }
 
-// ── Poll every 30s for real-time sync — NEVER re-renders page automatically ──
+// ── Poll every 45s — silently updates localStorage only, never touches the UI ──
 function startPolling(){
   clearInterval(_pollTimer);
   _pollTimer = setInterval(async function(){
-    if(!gasUrl||!CU||_saveTimer) return;
+    if(!gasUrl || !CU || _saveTimer || _bgSyncRunning) return;
     try{
       var data = await fbRead();
-      // Hard safety: never process empty/degraded data during active session
-      if(!data || !_hasRealData(data)) return;
-      var incoming = mergeWithDefaults(data);
-      // Account-count guard: never accept data with fewer accounts
-      var curAccounts = (db.managers||[]).length + (db.employees||[]).length;
-      var newAccounts = (incoming.managers||[]).length + (incoming.employees||[]).length;
-      if(newAccounts < curAccounts) return;
+      if(!data || !_hasRealData(data)) return; // ignore empty responses
       var hash = JSON.stringify(data);
-      if(hash===_lastHash) return; // No change
-      // Only silently update db — do NOT re-render (avoids blank screen on stale poll)
-      _lastHash=hash;
-      db=incoming;
-      try{localStorage.setItem(STORAGE_KEY,JSON.stringify(db));}catch(e){}
-      // Just update badges quietly — no full page re-render
-      updBadges();
-    }catch(e){}
-  },30000);
+      if(hash === _lastHash) return; // no change
+      var merged = _safeMerge(data); // safe account-count guard
+      if(merged){
+        _lastHash = hash;
+        // Only update badges — NEVER call renderPage from a background poll
+        if(CU) updBadges();
+      }
+    }catch(e){ /* silent — polling errors are non-critical */ }
+  }, 45000);
 }
 
 function clearGasUrl(){
@@ -2162,14 +2166,16 @@ document.addEventListener('DOMContentLoaded',function(){
   // Cross-tab/window sync — fixes Edge profile isolation
   window.addEventListener('storage',function(e){
     if(!e.key) return;
-    if(e.key===GAS_KEY){ gasUrl=e.newValue; return; }
-    if(e.key!==STORAGE_KEY||!e.newValue) return;
+    if(e.key===GAS_KEY){ gasUrl=e.newValue||gasUrl; return; }
+    if(e.key!==STORAGE_KEY || !e.newValue) return;
+    // Cross-tab sync: only accept if richer and user not logged in yet
+    if(CU) return; // don't touch db mid-session from another tab
     try{
-      var fresh=JSON.parse(e.newValue);
+      var fresh = JSON.parse(e.newValue);
       if(!_hasRealData(fresh)) return;
-      var fs=(fresh.managers||[]).length+(fresh.employees||[]).length;
-      var cs=(db&&db.managers?db.managers.length:0)+(db&&db.employees?db.employees.length:0);
-      if(fs>=cs){ db=mergeWithDefaults(fresh); if(!CU) console.log('[WorkTrackr] db synced from another tab'); }
+      var fs = (fresh.managers||[]).length+(fresh.employees||[]).length;
+      var cs = (db&&db.managers?db.managers.length:0)+(db&&db.employees?db.employees.length:0);
+      if(fs > cs){ db = mergeWithDefaults(fresh); }
     }catch(err){}
   });
 });
@@ -2682,8 +2688,13 @@ function doManagerSetup(){ createManagerDirect(); }
 
 function enterApp(user){
   CU=user;
-  // Snapshot the current good db to a backup key — used for session recovery
-  try{ localStorage.setItem(STORAGE_KEY+'_session_backup', localStorage.getItem(STORAGE_KEY)||''); }catch(e){}
+  // Write a solid session backup at login time — used for mid-session recovery
+  try{
+    var snap = localStorage.getItem(STORAGE_KEY);
+    if(snap && _hasRealData(JSON.parse(snap))){
+      localStorage.setItem(STORAGE_KEY+'_session_backup', snap);
+    }
+  }catch(e){}
   ['auth','pending-screen'].forEach(id=>document.getElementById(id).style.display='none');
   document.getElementById('app').style.display='block';
   document.getElementById('sb-nm').textContent=user.name;
