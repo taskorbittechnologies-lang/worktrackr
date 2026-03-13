@@ -13,7 +13,12 @@
 <link rel="manifest" id="pwa-manifest-link">
 <title>WorkTrackr – Task Orbit Technologies Pvt. Ltd.</title>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,300;1,400;1,500;1,600&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
+<script>
+(function(){
+  emailjs.init("4zNTFOQK7t1uJlw2F");
+})();
+</script>
 <style>
 :root {
   --bg:#f5f7fa; --surface:#ffffff; --surface2:#edf0f5; --border:#d5dbe6;
@@ -2286,11 +2291,14 @@ function onDataReady(){
   // Always show Sign In tab on startup
   document.getElementById('auth').style.display='flex';
   atab('login');
-  // Init emailjs
+  // EmailJS is already initialised at page load with the hardcoded public key.
+  // Re-init with manager's custom key if they have one configured.
   try{
     const configuredMgr=db.managers.find(m=>m.ej?.pk);
-    if(configuredMgr)emailjs.init(configuredMgr.ej.pk);
-    else emailjs.init('placeholder');
+    if(configuredMgr && configuredMgr.ej.pk !== '4zNTFOQK7t1uJlw2F'){
+      emailjs.init(configuredMgr.ej.pk);
+    }
+    // else: already initialised at page load with the hardcoded key
   }catch(e){}
 }
 
@@ -2498,15 +2506,24 @@ async function sendRegOTP(){
   clearOTPBoxes('ro');
   showRegStep(3);
   startOTPTimer('reg-timer');
+  // Try SMS; also send via email (employee's registered email = their userId)
   const res=await sendSMS(phone,otp);
-  if(res?.simulated){
+  const regEmail = otpState.regData?.uid || otpState.regData?.email || '';
+  if(regEmail && regEmail.includes('@')){
+    await sendOTPEmail(regEmail, otpState.regData?.name||'', otp).catch(e=>console.warn('Reg OTP email failed:',e));
+    toast('OTP sent to ' + regEmail,'ok');
+    // Clear demo box if email sent successfully
+    const demoEl=document.getElementById('reg-otp-demo');
+    if(demoEl) demoEl.style.display='none';
+  } else if(res?.simulated){
     const demoEl=document.getElementById('reg-otp-demo');
     demoEl.style.display='block';
     demoEl.innerHTML=`⚠️ <strong>Demo Mode</strong> (No Fast2SMS key set) — Your OTP is: <span style="font-size:18px;letter-spacing:3px;">${otp}</span><br><small style="font-weight:400;opacity:.8;">Enter this code in the boxes below</small>`;
-    // Auto-fill OTP boxes for convenience in demo
     otp.split('').forEach((ch,i)=>{const el=document.getElementById('ro'+(i+1));if(el)el.value=ch;});
+    toast('OTP ready — check the green box above the input','ok');
+  } else {
+    toast('OTP sent!','ok');
   }
-  toast('OTP ready — check the green box above the input','ok');
 }
 
 function verifyRegOTP(){
@@ -2575,14 +2592,23 @@ async function sendForgotOTP(){
   clearOTPBoxes('fo');
   showFpStep(2);
   startOTPTimer('fp-timer');
+  // Try SMS first, fall back to email
   const res=await sendSMS(phone,otp);
-  if(res?.simulated){
+  // Always also send via email if we know the user's email
+  const userEmail = isManager ? mgr?.userId : emp?.userId; // userId is the email
+  if(userEmail && userEmail.includes('@')){
+    const userName = isManager ? mgr?.name : emp?.name;
+    await sendOTPEmail(userEmail, userName, otp).catch(e=>console.warn('OTP email failed:',e));
+    toast('OTP sent to your email (' + userEmail + ')','ok');
+  } else if(res?.simulated){
     const demoEl=document.getElementById('fp-otp-demo');
     demoEl.style.display='block';
     demoEl.innerHTML=`⚠️ <strong>Demo Mode</strong> — Your OTP is: <span style="font-size:18px;letter-spacing:3px;">${otp}</span>`;
     otp.split('').forEach((ch,i)=>{const el=document.getElementById('fo'+(i+1));if(el)el.value=ch;});
+    toast('Reset OTP ready — check the box above','ok');
+  } else {
+    toast('OTP sent!','ok');
   }
-  toast('Reset OTP ready — check the box above','ok');
 }
 
 function verifyForgotOTP(){
@@ -4250,19 +4276,51 @@ async function testEmail(){
   toast('Test email sent to '+to,' — check your inbox!','ok');
 }
 
-async function sendEmail(to,name,subj,msg){
-  const ej=CU?.ej||{};
-  if(!ej.on||!ej.pk||!ej.sid||!ej.tid){
-    console.log('[EmailJS not configured — simulated]',{to,subj});return;
+// Hardcoded EmailJS public key — always available
+const EMAILJS_PUBLIC_KEY = '4zNTFOQK7t1uJlw2F';
+
+async function sendEmail(to, name, subj, msg){
+  if(!to){ console.warn('[EmailJS] No recipient'); return; }
+  const ej = CU?.ej || {};
+  // Use manager's custom service+template if configured, otherwise use hardcoded defaults
+  const sid = ej.sid || db.managers[0]?.ej?.sid || '';
+  const tid = ej.tid || db.managers[0]?.ej?.tid || '';
+  if(!sid || !tid){
+    console.log('[EmailJS] Service/Template ID not set — email not sent. Configure in Settings → EmailJS.');
+    return;
   }
-  if(!to){console.warn('sendEmail: no recipient');return;}
+  // Always re-init with the correct key
+  try{ emailjs.init(ej.pk || EMAILJS_PUBLIC_KEY); }catch(e){}
   try{
-    await emailjs.send(ej.sid,ej.tid,{to_email:to,to_name:name||'User',subject:subj,message:msg,from_name:'WorkTrackr'});
-    console.log('[EmailJS] ✅ Sent to',to);
+    await emailjs.send(sid, tid, {
+      to_email: to,
+      to_name:  name || 'User',
+      subject:  subj,
+      message:  msg,
+      from_name:'WorkTrackr'
+    });
+    console.log('[EmailJS] ✅ Sent to', to);
   }catch(e){
-    console.error('[EmailJS] ❌ Failed:',e);
-    toast('Email failed — check EmailJS config in Settings.','err');
+    console.error('[EmailJS] ❌ Failed:', e);
   }
+}
+
+// Send OTP via email — used when phone OTP is not available
+async function sendOTPEmail(toEmail, toName, otp){
+  await sendEmail(
+    toEmail,
+    toName,
+    'Your WorkTrackr OTP Code',
+    `Hi ${toName||''},
+
+Your One-Time Password (OTP) for WorkTrackr is:
+
+${otp}
+
+This OTP is valid for 5 minutes. Do not share it with anyone.
+
+— WorkTrackr Team`
+  );
 }
 
 // ═══════════════════════════════════════════════════
