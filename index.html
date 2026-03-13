@@ -566,13 +566,29 @@ tr:hover td{background:var(--surface2);}
           <button class="btn-p" style="background:var(--purple);" onclick="createManagerDirect()">✅ Create Manager Account →</button>
           <div class="auth-sw">Already have an account? <a onclick="atab('login')">Sign In</a></div>
         </div>
-        <!-- stubs so old references don't crash -->
-        <div id="mgr-setup-step2" style="display:none;"></div>
+        <!-- Step 2: Email OTP verification -->
+        <div id="mgr-setup-step2" style="display:none;">
+          <div style="text-align:center;margin-bottom:18px;">
+            <div style="font-size:36px;margin-bottom:8px;">📧</div>
+            <div style="font-family:'Poppins',sans-serif;font-weight:700;font-size:16px;color:var(--text);margin-bottom:6px;">Verify Your Email</div>
+            <div style="font-size:13px;color:var(--muted);line-height:1.6;">We sent a 6-digit OTP to<br><strong id="ms-email-display" style="color:var(--accent);"></strong></div>
+          </div>
+          <div id="ms-otp-demo" style="display:none;background:#fef3c7;border:1.5px solid #f59e0b;border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:13px;text-align:center;"></div>
+          <div style="display:flex;gap:8px;justify-content:center;margin-bottom:14px;">
+            <input class="otp-box" id="mo1" maxlength="1" oninput="otpMove(this,'mo2')" onkeydown="otpBack(event,this,null)" type="text" inputmode="numeric"/>
+            <input class="otp-box" id="mo2" maxlength="1" oninput="otpMove(this,'mo3')" onkeydown="otpBack(event,this,'mo1')" type="text" inputmode="numeric"/>
+            <input class="otp-box" id="mo3" maxlength="1" oninput="otpMove(this,'mo4')" onkeydown="otpBack(event,this,'mo2')" type="text" inputmode="numeric"/>
+            <input class="otp-box" id="mo4" maxlength="1" oninput="otpMove(this,'mo5')" onkeydown="otpBack(event,this,'mo3')" type="text" inputmode="numeric"/>
+            <input class="otp-box" id="mo5" maxlength="1" oninput="otpMove(this,'mo6')" onkeydown="otpBack(event,this,'mo4')" type="text" inputmode="numeric"/>
+            <input class="otp-box" id="mo6" maxlength="1" oninput="otpMove(this,null)"  onkeydown="otpBack(event,this,'mo5')" type="text" inputmode="numeric"/>
+          </div>
+          <div class="otp-timer" id="ms-timer" style="text-align:center;margin-bottom:14px;font-size:12px;color:var(--muted);"></div>
+          <div id="ms-otp-ok" style="display:none;" class="otp-success">✅ Email verified!</div>
+          <button class="btn-p" onclick="verifyMgrEmailOTP()">✅ Verify & Create Account →</button>
+          <div class="auth-sw"><a onclick="resendOTP('mgr')">Resend OTP</a> &nbsp;·&nbsp; <a onclick="mgrSetupBack()">← Back</a></div>
+        </div>
         <span id="ms-code" style="display:none;"></span>
         <span id="ms-phone-display" style="display:none;"></span>
-        <span id="ms-otp-ok" style="display:none;"></span>
-        <span id="ms-timer" style="display:none;"></span>
-        <span id="ms-otp-demo" style="display:none;"></span>
       </div>
     </div>
   </div>
@@ -2646,12 +2662,25 @@ async function resendOTP(ctx){
   startOTPTimer(timerMap[ctx]||'reg-timer');
   clearOTPBoxes(prefixMap[ctx]||'ro');
   if(ctx==='mgr'){const ok=document.getElementById('ms-otp-ok');if(ok)ok.style.display='none';}
-  const res=await sendSMS(otpState.phone,otp);
+
+  // For mgr and reg contexts, send via email
+  const d = otpState.regData || {};
+  const toEmail = d.email || d.uid || '';
+  const toName  = d.name || '';
+  if(toEmail && toEmail.includes('@')){
+    try{
+      await sendOTPEmail(toEmail, toName, otp);
+      toast('New OTP sent to '+toEmail,'ok');
+      return;
+    }catch(e){ /* fall through to demo */ }
+  }
+  // Fallback: SMS or demo
+  const res=await sendSMS(otpState.phone||'',otp);
   if(res?.simulated){
     const demoEl=document.getElementById(demoMap[ctx]);
     if(demoEl){
       demoEl.style.display='block';
-      demoEl.innerHTML=`⚠️ <strong>Demo Mode</strong> — OTP: <span style="font-size:18px;letter-spacing:3px;font-weight:700;">${otp}</span>`;
+      demoEl.innerHTML=`⚠️ OTP: <span style="font-size:18px;letter-spacing:3px;font-weight:700;">${otp}</span>`;
       const p=prefixMap[ctx]||'ro';
       otp.split('').forEach((ch,i)=>{const el=document.getElementById(p+(i+1));if(el)el.value=ch;});
     }
@@ -2671,8 +2700,8 @@ function mgrSetupBack(){
   aclear();
 }
 
-// Step 1 — validate all fields then send OTP
-function createManagerDirect(){
+// Step 1 — validate fields, send OTP to email, then show OTP step
+async function createManagerDirect(){
   aclear();
   const name      = document.getElementById('ms-name').value.trim();
   const email     = document.getElementById('ms-email').value.trim().toLowerCase();
@@ -2687,28 +2716,77 @@ function createManagerDirect(){
   if(!pw||pw.length<6){aerr('Password must be at least 6 characters.');return;}
   if(pw!==conf){aerr('Passwords do not match.');return;}
   if(db.managers.find(m=>m.userId.toLowerCase()===email)){
-    aerr('⛔ This email is already registered as a manager account.\n\nYou cannot create two accounts with the same email. Please sign in instead.');return;
+    aerr('⛔ This email is already registered as a manager account. Please sign in instead.');return;
   }
   if(db.employees.find(e=>e.userId.toLowerCase()===email)){
-    aerr('⛔ This email is already registered as an employee account.\n\nEach email can only be used for one account. Please use a different email.');return;
+    aerr('⛔ This email is already registered as an employee account. Please use a different email.');return;
   }
   if(db.managers.find(m=>m.phone===phone)){aerr('This mobile number is already registered to a manager.');return;}
 
-  // Resolve link by email (optional)
+  // Resolve optional link
   let linkedMgr=null;
   if(linkEmail){
     linkedMgr=db.managers.find(m=>(m.email||m.userId||'').toLowerCase()===linkEmail);
-    if(!linkedMgr){aerr('No manager found with that email. Ask the existing manager what email they registered with.');return;}
+    if(!linkedMgr){aerr('No manager found with that email.');return;}
     if((linkedMgr.email||linkedMgr.userId)===email){aerr('You cannot link to yourself.');return;}
   }
 
-  const newMgr={
-    id:'mgr'+db.nextMgrId++, name, userId:email, email,
-    password:pw, role:'manager', phone,
-    ej:{pk:'',sid:'',tid:'',me:email,on:false},
+  // Store pending manager data in otpState — account saved only after OTP verified
+  otpState.regData = { name, email, phone, pw, linkEmail, linkedMgrId: linkedMgr?.id||null, context:'mgr' };
+
+  // Generate & send OTP to their email
+  const otp = genOTP();
+  Object.assign(otpState, { code:otp, phone, context:'mgr', verified:false, expires: Date.now()+5*60*1000 });
+
+  // Show OTP step
+  document.getElementById('mgr-setup-step1').style.display='none';
+  document.getElementById('mgr-setup-step2').style.display='block';
+  const emailDisplay = document.getElementById('ms-email-display');
+  if(emailDisplay) emailDisplay.textContent = email;
+  clearOTPBoxes('mo');
+  startOTPTimer('ms-timer');
+  aclear();
+
+  // Send OTP via email
+  const btn = document.querySelector('#mgr-setup-step1 .btn-p');
+  toast('Sending OTP to '+email+'...','');
+  try{
+    await sendOTPEmail(email, name, otp);
+    toast('📧 OTP sent to '+email+' — check your inbox','ok');
+  }catch(e){
+    // Show OTP inline if email fails
+    const demoEl = document.getElementById('ms-otp-demo');
+    if(demoEl){
+      demoEl.style.display='block';
+      demoEl.innerHTML='⚠️ Email delivery issue. Your OTP is: <span style="font-size:20px;font-weight:900;letter-spacing:3px;color:#b45309;">'+otp+'</span>';
+      otp.split('').forEach((ch,i)=>{const el=document.getElementById('mo'+(i+1));if(el)el.value=ch;});
+    }
+    toast('⚠️ Could not send email — OTP shown above','warn');
+  }
+}
+
+// Step 2 — verify OTP, then create and save the manager account
+function verifyMgrEmailOTP(){
+  aclear();
+  const entered = getOTPInput('mo');
+  if(entered.length < 6){aerr('Please enter the complete 6-digit OTP.');return;}
+  if(Date.now() > otpState.expires){aerr('OTP expired. Click Resend OTP.');return;}
+  if(entered !== otpState.code){aerr('Incorrect OTP. Please try again.');return;}
+
+  clearInterval(otpState.timerInterval);
+  const okEl = document.getElementById('ms-otp-ok');
+  if(okEl){okEl.style.display='block';}
+
+  const d = otpState.regData;
+  const linkedMgr = d.linkedMgrId ? db.managers.find(m=>m.id===d.linkedMgrId) : null;
+
+  const newMgr = {
+    id:'mgr'+db.nextMgrId++, name:d.name, userId:d.email, email:d.email,
+    password:d.pw, role:'manager', phone:d.phone,
+    ej:{pk:'4zNTFOQK7t1uJlw2F',sid:'',tid:'',me:d.email,on:false},
     prefs:{assigned:true,complete:true,blocked:true,review:true,overdue:true},
     tags:[{id:'t1',name:'Urgent',color:'#c0472b'},{id:'t2',name:'Internal',color:'#2563a8'},{id:'t3',name:'Client',color:'#2a7c58'}],
-    nextTid:1, nextEid:1
+    nextTid:1, nextEid:1, emailVerified:true
   };
   if(linkedMgr){
     if(!linkedMgr.linkedManagers) linkedMgr.linkedManagers=[];
@@ -2717,17 +2795,16 @@ function createManagerDirect(){
   }
   db.managers.push(newMgr);
   saveDB();
-  ['ms-name','ms-email','ms-phone','ms-pw','ms-conf','ms-link-email'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
-  toast('✅ Manager account created! Signing you in...','ok');
+  toast('✅ Email verified! Account created — signing you in...','ok');
   setTimeout(()=>{
-    enterApp({...newMgr,role:'manager'});
-    setTimeout(()=>{ toast(linkedMgr?'🔗 Linked to '+linkedMgr.name+'! Welcome to WorkTrackr.':'🎉 Welcome to WorkTrackr! Your workspace is ready.','ok'); },600);
-  },400);
+    enterApp({...newMgr, role:'manager'});
+    setTimeout(()=>{ toast(linkedMgr?'🔗 Linked to '+linkedMgr.name+'! Welcome!':'🎉 Welcome to WorkTrackr! Your workspace is ready.','ok'); },600);
+  },500);
 }
 
 // Legacy stubs
 function mgrSetupStep1(){ createManagerDirect(); }
-function verifyMgrOTP(){ toast('Use the Create Account button.','warn'); }
+function verifyMgrOTP(){ verifyMgrEmailOTP(); }
 function doManagerSetup(){ createManagerDirect(); }
 
 function enterApp(user){
@@ -3773,7 +3850,8 @@ function openAddEmp(){
   // Populate role dropdown with manager's defined roles
   _populateRoleSelect(document.getElementById('e-role'), '', CU.id);
 }
-function addEmployee(){
+// Step 1 — validate fields, send OTP to employee email
+async function addEmployee(){
   const name  = document.getElementById('e-name').value.trim();
   const role  = document.getElementById('e-role').value.trim();
   const email = document.getElementById('e-email').value.trim().toLowerCase();
@@ -3787,35 +3865,104 @@ function addEmployee(){
   if(!pw)    { toast('Please set a password for this employee.','err'); return; }
   if(pw.length < 6){ toast('Password must be at least 6 characters.','err'); return; }
   if(pw !== conf)  { toast('Passwords do not match.','err'); return; }
-  if(db.managers.find(m=>m.userId.toLowerCase()===uid)){ toast('⛔ This email is already a manager account — cannot use it for an employee.','err'); return; }
-  if(db.employees.find(e=>e.userId.toLowerCase()===uid)||db.pendingRegs.find(r=>r.userId.toLowerCase()===uid)){ toast('⛔ An account with this email already exists. Each email can only be used once.','err'); return; }
-  // Find the actual manager record and ensure nextEid is a valid number
+  if(db.managers.find(m=>m.userId.toLowerCase()===uid)){ toast('⛔ This email is already a manager account.','err'); return; }
+  if(db.employees.find(e=>e.userId.toLowerCase()===uid)||db.pendingRegs.find(r=>r.userId.toLowerCase()===uid)){ toast('⛔ An account with this email already exists.','err'); return; }
+
+  // Store pending employee data — saved only after OTP verified
+  const otp = genOTP();
+  otpState.regData = { name, role: role||'Employee', email, uid, pw, phone, managerId: CU.id, context:'emp-create' };
+  Object.assign(otpState, { code: otp, phone, context:'emp-create', verified:false, expires: Date.now()+5*60*1000 });
+
+  // Show OTP modal
+  const modal = document.getElementById('emp-otp-modal');
+  const emailDisp = document.getElementById('emp-otp-email-display');
+  if(emailDisp) emailDisp.textContent = email;
+  const demoEl = document.getElementById('emp-otp-demo');
+  if(demoEl) demoEl.style.display='none';
+  clearOTPBoxes('eo');
+  if(modal) modal.style.display='flex';
+  startEmpOTPTimer();
+
+  // Send OTP to employee's email
+  toast('Sending OTP to '+email+'...','');
+  try{
+    await sendOTPEmail(email, name, otp);
+    toast('📧 OTP sent to '+email,'ok');
+  }catch(e){
+    if(demoEl){
+      demoEl.style.display='block';
+      demoEl.innerHTML='⚠️ Email delivery issue. Share this OTP with the employee: <span style="font-size:20px;font-weight:900;letter-spacing:3px;color:#b45309;">'+otp+'</span>';
+      otp.split('').forEach((ch,i)=>{const el=document.getElementById('eo'+(i+1));if(el)el.value=ch;});
+    }
+    toast('⚠️ Could not send email — OTP shown in modal','warn');
+  }
+}
+
+// Employee OTP timer
+let _empOtpTimer = null;
+function startEmpOTPTimer(){
+  clearInterval(_empOtpTimer);
+  const expires = otpState.expires;
+  function tick(){
+    const left = Math.max(0, expires - Date.now());
+    const m = Math.floor(left/60000), s = Math.floor((left%60000)/1000);
+    const el = document.getElementById('emp-otp-timer');
+    if(el) el.textContent = left>0 ? `OTP expires in ${m}:${s.toString().padStart(2,'0')}` : 'OTP expired — please resend.';
+    if(left<=0) clearInterval(_empOtpTimer);
+  }
+  tick(); _empOtpTimer = setInterval(tick, 1000);
+}
+
+async function resendEmpOTP(){
+  const otp = genOTP();
+  otpState.code = otp; otpState.expires = Date.now()+5*60*1000;
+  clearOTPBoxes('eo');
+  startEmpOTPTimer();
+  const d = otpState.regData;
+  try{
+    await sendOTPEmail(d.email, d.name, otp);
+    toast('New OTP sent to '+d.email,'ok');
+  }catch(e){
+    const demoEl = document.getElementById('emp-otp-demo');
+    if(demoEl){
+      demoEl.style.display='block';
+      demoEl.innerHTML='New OTP: <span style="font-size:20px;font-weight:900;letter-spacing:3px;color:#b45309;">'+otp+'</span>';
+      otp.split('').forEach((ch,i)=>{const el=document.getElementById('eo'+(i+1));if(el)el.value=ch;});
+    }
+  }
+}
+
+// Step 2 — verify OTP, then save employee account
+function verifyEmpEmailOTP(){
+  const entered = getOTPInput('eo');
+  if(entered.length < 6){ toast('Please enter the complete 6-digit OTP.','err'); return; }
+  if(Date.now() > otpState.expires){ toast('OTP expired. Click Resend OTP.','err'); return; }
+  if(entered !== otpState.code){ toast('Incorrect OTP. Please try again.','err'); return; }
+
+  const d = otpState.regData;
+  // Find manager and ensure nextEid is valid
   const mgr = db.managers.find(m=>m.id===CU.id) || myMgr();
-  if(!mgr){ toast('Manager account not found. Please log out and log in again.','err'); return; }
+  if(!mgr){ toast('Manager account not found.','err'); return; }
   if(typeof mgr.nextEid !== 'number' || isNaN(mgr.nextEid)){
-    // Recalculate from existing employees to avoid ID collisions
     const maxId = db.employees.reduce((mx,e)=>Math.max(mx, typeof e.id==='number'?e.id:0), 0);
     mgr.nextEid = maxId + 1;
   }
   const newEmpId = mgr.nextEid++;
   db.employees.push({
-    id: newEmpId,
-    name,
-    role: role||'Employee',
-    userId: uid,
-    email,
-    password: pw,
-    phone: phone||'',
-    managerIds: [CU.id],
-    managerId: CU.id,
-    joinDate: new Date().toISOString().slice(0,10)
+    id: newEmpId, name: d.name, role: d.role,
+    userId: d.uid, email: d.email, password: d.pw,
+    phone: d.phone||'', managerIds:[CU.id], managerId:CU.id,
+    joinDate: new Date().toISOString().slice(0,10),
+    emailVerified: true
   });
   ['e-name','e-email','e-pw','e-pw-conf','e-phone'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
-  document.getElementById('e-role').value='';
-  const pwBar=document.getElementById('e-pwbar'); if(pwBar) pwBar.style.width='0';
+  const roleEl = document.getElementById('e-role'); if(roleEl) roleEl.value='';
+  const pwBar = document.getElementById('e-pwbar'); if(pwBar) pwBar.style.width='0';
+  document.getElementById('emp-otp-modal').style.display='none';
+  clearInterval(_empOtpTimer);
   cm('m-emp'); renderEmployees(); updBadges();
   saveDB();
-  toast(`✅ Account created for ${name}! They can log in with their email and password.`,'ok');
+  toast(`✅ Account created for ${d.name}! Email verified. They can log in now.`,'ok');
 }
 function resetPw(eid){
   const e=db.employees.find(e=>e.id===eid);
@@ -7919,6 +8066,33 @@ function _renderGpsBanner(){
     <div id="bday-name" style="font-size:26px;font-weight:900;background:linear-gradient(135deg,#f59e0b,#ec4899);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-family:'Poppins',sans-serif;margin-bottom:14px;"></div>
     <div style="font-size:14px;color:#6b7a8d;line-height:1.7;margin-bottom:22px;">🎉 Wishing you a wonderful day filled with joy and happiness!<br>The entire <strong>WorkTrackr</strong> team wishes you all the best! 🌟</div>
     <button onclick="document.getElementById('bday-modal').style.display='none'" style="background:linear-gradient(135deg,#f59e0b,#ec4899);color:#fff;border:none;padding:12px 28px;border-radius:12px;font-family:'Poppins',sans-serif;font-weight:700;font-size:14px;cursor:pointer;">🎊 Thank You!</button>
+  </div>
+</div>
+
+<!-- Employee Email OTP Verification Modal -->
+<div id="emp-otp-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:#fff;border-radius:20px;padding:32px 28px;width:100%;max-width:400px;box-shadow:0 24px 60px rgba(0,0,0,.25);position:relative;">
+    <div style="text-align:center;margin-bottom:20px;">
+      <div style="font-size:40px;margin-bottom:8px;">📧</div>
+      <div style="font-family:'Poppins',sans-serif;font-weight:800;font-size:17px;color:#1a2340;margin-bottom:6px;">Verify Employee Email</div>
+      <div style="font-size:13px;color:#6b7a8d;line-height:1.6;">OTP sent to<br><strong id="emp-otp-email-display" style="color:#1e4db7;"></strong></div>
+    </div>
+    <div id="emp-otp-demo" style="display:none;background:#fef3c7;border:1.5px solid #f59e0b;border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:13px;text-align:center;"></div>
+    <div style="display:flex;gap:8px;justify-content:center;margin-bottom:14px;">
+      <input class="otp-box" id="eo1" maxlength="1" oninput="otpMove(this,'eo2')" onkeydown="otpBack(event,this,null)" type="text" inputmode="numeric"/>
+      <input class="otp-box" id="eo2" maxlength="1" oninput="otpMove(this,'eo3')" onkeydown="otpBack(event,this,'eo1')" type="text" inputmode="numeric"/>
+      <input class="otp-box" id="eo3" maxlength="1" oninput="otpMove(this,'eo4')" onkeydown="otpBack(event,this,'eo2')" type="text" inputmode="numeric"/>
+      <input class="otp-box" id="eo4" maxlength="1" oninput="otpMove(this,'eo5')" onkeydown="otpBack(event,this,'eo3')" type="text" inputmode="numeric"/>
+      <input class="otp-box" id="eo5" maxlength="1" oninput="otpMove(this,'eo6')" onkeydown="otpBack(event,this,'eo4')" type="text" inputmode="numeric"/>
+      <input class="otp-box" id="eo6" maxlength="1" oninput="otpMove(this,null)"  onkeydown="otpBack(event,this,'eo5')" type="text" inputmode="numeric"/>
+    </div>
+    <div class="otp-timer" id="emp-otp-timer" style="text-align:center;margin-bottom:14px;font-size:12px;color:#9ca3af;"></div>
+    <button onclick="verifyEmpEmailOTP()" style="width:100%;background:linear-gradient(135deg,#1e4db7,#0694a2);color:#fff;border:none;padding:13px;border-radius:12px;font-family:'Poppins',sans-serif;font-weight:700;font-size:14px;cursor:pointer;">✅ Verify & Create Account</button>
+    <div style="text-align:center;margin-top:12px;font-size:12px;color:#9ca3af;">
+      <a onclick="resendEmpOTP()" style="color:#1e4db7;cursor:pointer;font-weight:600;">Resend OTP</a>
+      &nbsp;·&nbsp;
+      <a onclick="document.getElementById('emp-otp-modal').style.display='none'" style="cursor:pointer;">Cancel</a>
+    </div>
   </div>
 </div>
 
