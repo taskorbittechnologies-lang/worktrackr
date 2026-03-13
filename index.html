@@ -1850,6 +1850,24 @@ let gasUrl     = null;  // holds Firebase DB URL
 let _saveTimer = null;
 let _pollTimer = null;
 let _lastHash  = '';
+// ══════════════════════════════════════════════════════════
+// ESSENTIAL DATE / TIME HELPERS (used throughout the app)
+// ══════════════════════════════════════════════════════════
+
+// Returns today's date as "YYYY-MM-DD"
+function todayStr(){
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+
+// Returns current time as "HH:MM:SS AM/PM"
+function nowTime(){
+  return new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true});
+}
+
 
 function getGasUrl(){ return localStorage.getItem(GAS_KEY)||FIREBASE_URL||null; }
 
@@ -5897,7 +5915,9 @@ function checkIn(){
     toast('✅ Clocked in at '+time+sourceLabel,'ok');
     renderAttendance();
   }).catch(errMsg=>{
-    toast(errMsg,'err');
+    console.error('[ClockIn] error:', errMsg);
+    const msg = (errMsg instanceof Error) ? errMsg.message : String(errMsg||'Unknown error');
+    toast('❌ Clock In failed: '+msg,'err');
     if(ciBtn){ ciBtn.disabled=false; ciBtn.innerHTML='<span style="font-size:22px;">🟢</span> Clock In'; }
   });
 }
@@ -5926,7 +5946,9 @@ function checkOut(){
     toast('✅ Clocked out at '+time+' · Duration: '+dur+sourceLabel,'ok');
     renderAttendance();
   }).catch(errMsg=>{
-    toast(errMsg,'err');
+    console.error('[ClockOut] error:', errMsg);
+    const msg = (errMsg instanceof Error) ? errMsg.message : String(errMsg||'Unknown error');
+    toast('❌ Clock Out failed: '+msg,'err');
     if(coBtn){ coBtn.disabled=false; coBtn.innerHTML='<span style="font-size:22px;">🔴</span> Clock Out'; }
   });
 }
