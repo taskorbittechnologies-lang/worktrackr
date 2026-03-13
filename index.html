@@ -6183,72 +6183,13 @@ function _renderEmp(selMonth){
   coEl.textContent  = rec?.checkOut || '—';
   durEl.textContent = rec ? calcDuration(rec.checkIn, rec.checkOut) : '—';
 
-  const registeredIp = getRegisteredIp(CU.empId);
   const mobile = isMobileDevice();
   const banner = document.getElementById('att-device-banner');
 
-  if(mobile){
-    // Mobile — GPS handles auth, show buttons immediately
-    banner.style.display='none';
-    _setAttButtons(rec, ciBtn, coBtn, statusEl, noteEl);
-  } else if(!registeredIp){
-    // PC not registered — show register prompt, hide buttons
-    banner.style.display='block';
-    banner.innerHTML=`<strong>🖥️ Register This PC</strong> — Your PC must be registered before marking attendance from a computer.<br><br>
-      <button onclick="registerDevice()" style="background:var(--blue);color:#fff;border:none;padding:8px 20px;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;font-family:'Poppins',sans-serif;">✅ Register This PC</button>`;
-    ciBtn.style.display='none'; coBtn.style.display='none';
-    if(statusEl) statusEl.textContent='Register this PC to enable attendance.';
-    if(noteEl)   noteEl.textContent='';
-  } else {
-    // PC registered — show "verifying" then reveal buttons after IP resolves
-    banner.style.cssText='display:block;background:#f0f9ff;border:1px solid #bae6fd;border-radius:12px;padding:14px 18px;margin-bottom:18px;font-size:13px;color:#0369a1;';
-    banner.innerHTML='<strong>🔄 Verifying your PC...</strong> Checking IP address.';
-    ciBtn.style.display='none'; coBtn.style.display='none';
-    if(statusEl) statusEl.innerHTML='<span style="color:var(--muted);">Verifying PC...</span>';
-
-    // Snapshot rec at this point — async callback uses it
-    const recSnap = getTodayRecord(CU.empId);
-    getDeviceIp().then(currentIp=>{
-      if(!currentIp){
-        banner.style.cssText='display:block;background:var(--orange-l);border:1px solid var(--orange);border-radius:12px;padding:14px 18px;margin-bottom:18px;font-size:13px;';
-        banner.innerHTML=`<strong>⚠️ IP Check Failed</strong> — Could not verify your PC IP.<br><small style="color:var(--muted);">Registered: ${registeredIp}</small>`;
-        // Still allow attendance on IP check failure (network issue, not fraud)
-        _setAttButtons(recSnap,
-          document.getElementById('att-checkin-btn'),
-          document.getElementById('att-checkout-btn'),
-          document.getElementById('att-punch-status'),
-          document.getElementById('att-today-note'));
-        return;
-      }
-      if(currentIp===registeredIp){
-        banner.style.cssText='display:block;background:#f0fdf4;border:1.5px solid #34d399;border-radius:12px;padding:11px 18px;margin-bottom:18px;font-size:13px;color:#065f46;';
-        banner.innerHTML=`✅ <strong>Registered PC</strong> — <code style="background:#d1fae5;padding:1px 6px;border-radius:4px;">${currentIp}</code> &nbsp;·&nbsp; ${getDeviceName()}
-          <button onclick="registerDevice()" style="margin-left:12px;background:transparent;color:#059669;border:1px solid #34d399;padding:3px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;">🔄 Re-register</button>`;
-        _setAttButtons(recSnap,
-          document.getElementById('att-checkin-btn'),
-          document.getElementById('att-checkout-btn'),
-          document.getElementById('att-punch-status'),
-          document.getElementById('att-today-note'));
-      } else {
-        banner.style.cssText='display:block;background:#fff1f2;border:1.5px solid #fca5a5;border-radius:12px;padding:14px 18px;margin-bottom:18px;font-size:13px;';
-        banner.innerHTML=`<strong>⛔ Unregistered PC</strong> — Use your registered PC to mark attendance.<br>
-          <div style="margin-top:8px;font-size:12px;color:#7f1d1d;">Registered: <code style="background:#fee2e2;padding:1px 6px;border-radius:4px;">${registeredIp}</code> · Yours: <code style="background:#fee2e2;padding:1px 6px;border-radius:4px;">${currentIp}</code></div>`;
-        const ci2=document.getElementById('att-checkin-btn'),co2=document.getElementById('att-checkout-btn'),st2=document.getElementById('att-punch-status');
-        if(ci2) ci2.style.display='none'; if(co2) co2.style.display='none';
-        if(st2) st2.innerHTML='<span style="color:var(--red);font-weight:600;">⛔ PC not authorised</span>';
-      }
-    }).catch(()=>{
-      // Network error during IP check — allow attendance
-      banner.style.cssText='display:block;background:var(--orange-l);border:1px solid var(--orange);border-radius:12px;padding:14px 18px;margin-bottom:18px;font-size:13px;';
-      banner.innerHTML='<strong>⚠️ Could not verify IP</strong> — Attendance allowed.';
-      _setAttButtons(recSnap,
-        document.getElementById('att-checkin-btn'),
-        document.getElementById('att-checkout-btn'),
-        document.getElementById('att-punch-status'),
-        document.getElementById('att-today-note'));
-    });
-    // Fall through — table renders immediately below
-  }
+  // Always hide the device banner and show attendance buttons immediately.
+  // GPS geofencing (if configured by manager) is checked at the moment of tapping the button.
+  if(banner) banner.style.display = 'none';
+  _setAttButtons(rec, ciBtn, coBtn, statusEl, noteEl);
 
   startLiveClock();
 
@@ -7836,53 +7777,31 @@ function saveGpsPolicy(){
 // Returns a Promise: resolves with {ok:true, lat, lng, source} or rejects with error message
 function _gpsCheckLocation(empId){
   return new Promise((resolve, reject)=>{
-    const cfg = getEmpGpsConfig(empId);
     const mobile = isMobileDevice();
+    const source = mobile ? 'mobile-gps' : 'pc';
 
-    // PC path — verify IP against registered IP
-    if(!mobile){
-      const emp = db.employees.find(e=>e.id==empId);
-      const gpsCfg = db.managers.find(m=>(emp?.managerIds||[emp?.managerId]).includes(m.id))?.gpsConfig||{};
-      if(gpsCfg.enabled&&gpsCfg.requireMobile&&!gpsCfg.allowPc){
-        reject('🚫 Attendance on PC is disabled by your manager. Please use your mobile device with GPS.');
+    // GPS geofencing only applies if manager configured it AND employee is on mobile
+    if(mobile){
+      const cfg = getEmpGpsConfig(empId);
+      if(cfg && navigator.geolocation){
+        navigator.geolocation.getCurrentPosition(pos=>{
+          const lat=pos.coords.latitude, lng=pos.coords.longitude;
+          const dist=haversineMetres(lat,lng,cfg.lat,cfg.lng);
+          if(dist > cfg.radius){
+            reject(`📍 You are ${Math.round(dist)}m away from "${cfg.name||'the work location'}" (allowed: ${cfg.radius}m). Please move closer.`);
+          } else {
+            resolve({ok:true, lat:lat.toFixed(6), lng:lng.toFixed(6), source:'mobile-gps', dist:Math.round(dist)});
+          }
+        }, err=>{
+          // GPS error — still allow attendance, record without coords
+          resolve({ok:true, lat:null, lng:null, source:'mobile-gps'});
+        },{enableHighAccuracy:true, timeout:10000, maximumAge:0});
         return;
       }
-      // IP check
-      const regIp = getRegisteredIp(empId);
-      if(!regIp){
-        reject('🖥️ This PC is not registered. Go to Attendance and register your PC first.');
-        return;
-      }
-      getDeviceIp().then(currentIp=>{
-        if(!currentIp){
-          reject('⚠️ Could not verify your PC\'s IP address. Please check your internet connection.');
-          return;
-        }
-        if(currentIp!==regIp){
-          reject(`⛔ Unregistered PC — Your current IP (${currentIp}) does not match your registered PC (${regIp}).\n\nPlease mark attendance from your registered PC.`);
-          return;
-        }
-        resolve({ok:true, lat:null, lng:null, source:'pc'});
-      }).catch(()=>reject('⚠️ IP verification failed. Please check your internet connection.'));
-      return;
     }
 
-    // Mobile path — GPS required if configured
-    if(!cfg){ resolve({ok:true, lat:null, lng:null, source:'mobile-gps'}); return; }
-    if(!navigator.geolocation){ reject('📍 GPS is not available on this device/browser.'); return; }
-
-    navigator.geolocation.getCurrentPosition(pos=>{
-      const lat=pos.coords.latitude, lng=pos.coords.longitude;
-      const dist=haversineMetres(lat,lng,cfg.lat,cfg.lng);
-      if(dist>cfg.radius){
-        reject(`📍 You are ${Math.round(dist)}m away from "${cfg.name||'the work location'}" (allowed: ${cfg.radius}m).\n\nPlease move closer to mark attendance.`);
-      } else {
-        resolve({ok:true, lat:lat.toFixed(6), lng:lng.toFixed(6), source:'mobile-gps', dist:Math.round(dist)});
-      }
-    }, err=>{
-      const msgs={1:'Location permission denied. Please enable GPS to mark attendance.',2:'Unable to determine your location. Ensure GPS is enabled.',3:'GPS timed out. Please try again.'};
-      reject('📍 '+(msgs[err.code]||'GPS error: '+err.message));
-    },{enableHighAccuracy:true,timeout:15000,maximumAge:0});
+    // PC or no GPS config — always allow immediately
+    resolve({ok:true, lat:null, lng:null, source:source});
   });
 }
 
