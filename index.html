@@ -1992,26 +1992,40 @@ async function _syncFromFirebaseBackground(){
   if(!gasUrl) return;
   try{
     var data = await fbRead();
-    if(!data) return;
-    var cloudDb = mergeWithDefaults(data);
-    var cloudScore = (cloudDb.managers||[]).length + (cloudDb.employees||[]).length + (cloudDb.tasks||[]).length;
-    var localScore = (db.managers||[]).length + (db.employees||[]).length + (db.tasks||[]).length;
-    if(cloudScore > localScore){
-      // Cloud has more data — update db and localStorage
-      db = cloudDb;
-      try{localStorage.setItem(STORAGE_KEY,JSON.stringify(db));}catch(ex){}
-      _lastHash = JSON.stringify(db);
-      console.log('[WorkTrackr] Background sync: cloud data merged');
-    } else if(cloudScore < localScore || !_hasRealData(data)){
-      // Local is richer — push back to cloud
+    // SAFETY: never accept data that has fewer accounts than what we have locally
+    if(!data || !_hasRealData(data)){
+      // Firebase empty — push our local data up to cloud
       await fbWrite(db);
-      console.log('[WorkTrackr] Background sync: pushed local data to cloud');
+      console.log('[WorkTrackr] Background sync: pushed local data to empty cloud');
+      _lastHash = JSON.stringify(db);
+      startPolling();
+      return;
+    }
+    var cloudDb = mergeWithDefaults(data);
+    var cloudAccounts = (cloudDb.managers||[]).length + (cloudDb.employees||[]).length;
+    var localAccounts = (db.managers||[]).length + (db.employees||[]).length;
+    // Only accept cloud data if it has at least as many accounts as local
+    if(cloudAccounts >= localAccounts){
+      var cloudScore = cloudAccounts + (cloudDb.tasks||[]).length;
+      var localScore = localAccounts + (db.tasks||[]).length;
+      if(cloudScore > localScore){
+        db = cloudDb;
+        try{localStorage.setItem(STORAGE_KEY,JSON.stringify(db));}catch(ex){}
+        console.log('[WorkTrackr] Background sync: merged richer cloud data');
+      } else if(cloudScore < localScore){
+        await fbWrite(db);
+        console.log('[WorkTrackr] Background sync: pushed richer local data to cloud');
+      }
+    } else {
+      // Cloud has fewer accounts — local is authoritative, push up
+      await fbWrite(db);
+      console.log('[WorkTrackr] Background sync: local has more accounts, pushed to cloud');
     }
     _lastHash = JSON.stringify(db);
     startPolling();
   }catch(e){
     console.warn('[WorkTrackr] Background Firebase sync failed:',e.message);
-    setTimeout(function(){ _retryFirebase(); }, 8000);
+    setTimeout(function(){ _retryFirebase(); }, 10000);
   }
 }
 
@@ -2063,10 +2077,15 @@ async function retryCloudLoad(){
 // ── Save (debounced 1s) ──
 function saveDB(){
   try{
+    // SAFETY: never save an empty/degraded db — would wipe good localStorage data
+    if(!_hasRealData(db)){
+      console.warn('[WorkTrackr] saveDB blocked — db has no real data, skipping save');
+      return;
+    }
     var serialized = JSON.stringify(db);
     localStorage.setItem(STORAGE_KEY, serialized);
     // Keep session backup fresh so recovery always has the latest good state
-    if(CU && _hasRealData(db)) localStorage.setItem(STORAGE_KEY+'_session_backup', serialized);
+    if(CU) localStorage.setItem(STORAGE_KEY+'_session_backup', serialized);
   }catch(e){}
   if(!gasUrl) return;
   clearTimeout(_saveTimer);
@@ -2084,31 +2103,30 @@ async function _pushToCloud(){
   }
 }
 
-// ── Poll every 15s for real-time sync ──
+// ── Poll every 30s for real-time sync — NEVER re-renders page automatically ──
 function startPolling(){
   clearInterval(_pollTimer);
   _pollTimer = setInterval(async function(){
     if(!gasUrl||!CU||_saveTimer) return;
     try{
       var data = await fbRead();
-      if(!data || !_hasRealData(data)) return; // Never accept empty data during active session
-      var hash = JSON.stringify(data);
-      if(hash===_lastHash) return;
-
-      // Safety: only accept if incoming has at least as many accounts as current db
+      // Hard safety: never process empty/degraded data during active session
+      if(!data || !_hasRealData(data)) return;
       var incoming = mergeWithDefaults(data);
-      var curScore = (db.managers||[]).length + (db.employees||[]).length;
-      var newScore = (incoming.managers||[]).length + (incoming.employees||[]).length;
-      if(newScore < curScore) return; // Incoming looks degraded — skip this poll
-
+      // Account-count guard: never accept data with fewer accounts
+      var curAccounts = (db.managers||[]).length + (db.employees||[]).length;
+      var newAccounts = (incoming.managers||[]).length + (incoming.employees||[]).length;
+      if(newAccounts < curAccounts) return;
+      var hash = JSON.stringify(data);
+      if(hash===_lastHash) return; // No change
+      // Only silently update db — do NOT re-render (avoids blank screen on stale poll)
       _lastHash=hash;
       db=incoming;
       try{localStorage.setItem(STORAGE_KEY,JSON.stringify(db));}catch(e){}
-      var pg=document.querySelector('.page.on');
-      if(pg) renderPage(pg.id.replace('page-',''));
+      // Just update badges quietly — no full page re-render
       updBadges();
     }catch(e){}
-  },15000);
+  },30000);
 }
 
 function clearGasUrl(){
@@ -2713,22 +2731,45 @@ function renderPage(id){
   // Guard: if db has been wiped mid-session, recover from backup before rendering
   if(CU && db && !_hasRealData(db)){
     console.warn('[WorkTrackr] DB integrity check failed mid-session — recovering from backup');
+    var recovered = false;
     try{
       var backup = localStorage.getItem(STORAGE_KEY+'_session_backup');
       if(backup){
-        var recovered = JSON.parse(backup);
-        if(_hasRealData(recovered)){
-          db = mergeWithDefaults(recovered);
+        var bparsed = JSON.parse(backup);
+        if(_hasRealData(bparsed)){
+          db = mergeWithDefaults(bparsed);
           localStorage.setItem(STORAGE_KEY, backup);
-          toast('⚠ Data recovered from backup — cloud sync issue detected','warn');
-          // Push recovered data back to Firebase
+          recovered = true;
+          toast('⚠ Data recovered from session backup','warn');
           if(gasUrl) _pushToCloud();
         }
       }
     }catch(ex){}
+    // If recovery failed, try main storage key
+    if(!recovered){
+      try{
+        var main = localStorage.getItem(STORAGE_KEY);
+        if(main){ var mparsed=JSON.parse(main); if(_hasRealData(mparsed)){ db=mergeWithDefaults(mparsed); recovered=true; }}
+      }catch(ex2){}
+    }
+    if(!recovered){
+      // Nothing to recover — show a helpful message instead of blank screen
+      const pageEl = document.getElementById('page-'+id);
+      if(pageEl) pageEl.innerHTML='<div style="padding:40px;text-align:center;color:var(--muted);"><div style="font-size:48px;margin-bottom:16px;">⚠️</div><div style="font-size:16px;font-weight:700;margin-bottom:8px;">Data temporarily unavailable</div><div style="font-size:13px;">Your data could not be loaded. <a href="javascript:location.reload()" style="color:var(--blue);">Tap here to reload</a> or check your internet connection.</div></div>';
+      return;
+    }
   }
   const r={dashboard:renderDash,tasks:renderTasks,notifications:renderNotifs,approvals:renderApprovals,employees:renderEmployees,metrics:renderMetrics,tags:renderTags,settings:loadSettings,attendance:renderAttendance,recurring:renderRecurring,calendar:renderCalendar,leaves:renderLeaves,workload:renderWorkload,support:renderSupport,salary:renderSalary,mypayslips:renderMyPayslips};
-  if(r[id])r[id]();
+  try{
+    if(r[id]) r[id]();
+  }catch(err){
+    console.error('[WorkTrackr] renderPage error on '+id+':', err);
+    // Don't blank the screen — show the error in-page
+    const pageEl = document.getElementById('page-'+id);
+    if(pageEl && !pageEl.innerHTML.trim()){
+      pageEl.innerHTML='<div style="padding:40px;text-align:center;color:var(--muted);"><div style="font-size:36px;margin-bottom:12px;">⚠️</div><div style="font-size:14px;">Something went wrong loading this page. <a href="javascript:location.reload()" style="color:var(--blue);">Reload</a></div></div>';
+    }
+  }
   updBadges();
 }
 
