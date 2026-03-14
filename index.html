@@ -304,9 +304,7 @@ tr:hover td{background:var(--surface2);}
 .ej-banner{background:#fffdf0;border:1.5px solid #e8d060;border-radius:12px;padding:16px 20px;margin-bottom:20px;}
 .ej-banner h3{font-family:'Poppins',sans-serif;font-size:14px;margin-bottom:5px;color:#7a5800;}
 .ej-banner p{font-size:12px;color:#8a6800;margin-bottom:10px;line-height:1.6;}
-.ej-fields{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;}
-.ej-fields input{padding:8px 11px;border:1.5px solid #e0c050;border-radius:7px;font-size:12px;background:#fffcf0;outline:none;font-family:'Poppins',sans-serif;}
-.btn-ej{background:#c8a020;color:#fff;border:none;padding:8px 16px;border-radius:7px;font-family:'Poppins',sans-serif;font-weight:700;font-size:12px;cursor:pointer;}
+
 
 /* OVERDUE BANNER */
 .ov-banner{background:var(--red-l);border:1.5px solid #f8c0c0;border-radius:12px;padding:14px 18px;margin-bottom:18px;}
@@ -651,14 +649,6 @@ tr:hover td{background:var(--surface2);}
           <button class="fab e-only" onclick="requestManagerLink()" style="display:none;background:var(--purple);" title="Link to another manager">&#128279; Link Manager</button>
         </div>
       </div>
-      <div id="ej-banner" class="ej-banner" style="display:none">
-        <h3>⚙️ Enable real email notifications via EmailJS</h3>
-        <p>Set up email notifications via <strong>emailjs.com</strong> → create an account, a service, and a template with variables: to_email, to_name, subject, message, from_name.</p>
-        <div class="ej-fields">
-          <input id="cfg-pk" placeholder="Public Key"/><input id="cfg-sid" placeholder="Service ID"/><input id="cfg-tid" placeholder="Template ID"/>
-        </div>
-        <button class="btn-ej" onclick="saveEJconfig()">Save & Enable</button>
-      </div>
       <div id="mgr-email-banner" class="ej-banner" style="display:none;background:#f0f6ff;border-color:#b0d4f0;">
         <h3 style="color:#1a3a6a;">🔗 Set Your Manager Email — Required for Employee Registration</h3>
         <p style="color:#2a4a7a;">Employees need your email to link their registration to you. Set it once here, then share it with your team.</p>
@@ -979,7 +969,6 @@ tr:hover td{background:var(--surface2);}
   <button id="stab-roles"   class="stab"         onclick="switchStab('roles')">💼 Job Roles</button>
   <button id="stab-policy"  class="stab"         onclick="switchStab('policy')">📅 Work Policy</button>
   <button id="stab-gps"     class="stab"         onclick="switchStab('gps')">📍 GPS Location</button>
-  <button id="stab-integr"  class="stab"         onclick="switchStab('integr')">🔗 Integrations</button>
   <button id="stab-notif"   class="stab"         onclick="switchStab('notif')">🔔 Notifications</button>
   <button id="stab-data"    class="stab"         onclick="switchStab('data')">💾 Data &amp; Security</button>
 </div>
@@ -1080,32 +1069,6 @@ tr:hover td{background:var(--surface2);}
         </div>
 
 </div><!-- /stab-body-profile -->
-
-<!-- TAB: INTEGRATIONS -->
-<div id="stab-body-integr" style="display:none;">
-        <div class="set-sec">
-          <h3>📱 Fast2SMS Configuration (OTP via SMS)</h3>
-          <div class="field"><label>Fast2SMS API Key</label><input id="s-f2s" placeholder="Your Fast2SMS API key from fast2sms.com"/></div>
-          <div style="font-size:12px;color:var(--muted);margin-top:-8px;margin-bottom:12px;">Get an API key at <strong>fast2sms.com</strong> → Sign Up → Developer → API.</div>
-          <button class="btn-sub" onclick="saveF2S()">Save API Key</button>
-          <span id="f2s-status" style="margin-left:10px;font-size:12px;color:var(--muted);"></span>
-        </div>
-
-        <div class="set-sec">
-          <h3>📧 EmailJS Configuration</h3>
-          <div class="field"><label>Public Key</label><input id="s-pk" placeholder="Your EmailJS Public Key"/></div>
-          <div class="frow">
-            <div class="field"><label>Service ID</label><input id="s-sid" placeholder="service_xxxxxx"/></div>
-            <div class="field"><label>Template ID</label><input id="s-tid" placeholder="template_xxxxxx"/></div>
-          </div>
-          <div class="field"><label>Manager Email (receives all alerts)</label><input id="s-me" type="email" placeholder="you@company.com"/></div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button class="btn-sub" onclick="saveSettings()">Save &amp; Enable</button>
-            <button class="btn-sub" style="background:var(--green);" onclick="testEmail()">📨 Send Test Email</button>
-          </div>
-        </div>
-
-</div><!-- /stab-body-integr -->
 
 <!-- TAB: NOTIFICATIONS -->
 <div id="stab-body-notif" style="display:none;">
@@ -2305,10 +2268,7 @@ function onDataReady(){
   // Re-init with manager's custom key if they have one configured.
   try{
     const configuredMgr=db.managers.find(m=>m.ej?.pk);
-    if(configuredMgr && configuredMgr.ej.pk !== '4zNTFOQK7t1uJlw2F'){
-      emailjs.init(configuredMgr.ej.pk);
-    }
-    // else: already initialised at page load with the hardcoded key
+    // EmailJS initialised at page load with hardcoded credentials — no override needed
   }catch(e){}
 }
 
@@ -2818,7 +2778,7 @@ function enterApp(user){
   if(isMgr){
     ['n-approvals','n-employees','n-attendance-mgr','n-recurring','n-salary','n-workload','n-metrics','n-tags'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='flex';});
     document.querySelectorAll('.fab.m-only').forEach(el=>el.style.display='inline-flex');
-    document.getElementById('ej-banner').style.display=(CU.ej?.on)?'none':'block';
+    document.getElementById('ej-banner')?.remove();
     document.getElementById('mgr-email-banner').style.display=CU.email?'none':'block';
   } else {
     document.getElementById('n-attendance').style.display='flex';
@@ -3522,8 +3482,8 @@ function requestTransfer(){
   t.audit.push({who:CU.name,action:`Transfer requested to ${toEmp.name}. Reason: ${reason}. Awaiting manager approval.`,at:tnow(),type:'audit'});
   saveDB(); // ← was missing!
   notify({category:'approval',icon:'🔄',title:'Transfer Request',msg:`${CU.name} wants to transfer "${t.title}" to ${toEmp.name}. Approve in Approvals.`,for:t.managerId});
-  const ej=myMgr().ej||{};
-  if(ej.on&&ej.me) sendEmail(ej.me,'Manager',`Transfer Request: ${t.title}`,`${CU.name} requested to transfer "${t.title}" to ${toEmp.name}.\n\nReason: ${reason}\n\nLog in → Approvals to approve or reject.`);
+  const mgrMe=mgrEmail();
+  if(mgrMe) sendEmail(mgrMe,'Manager',`Transfer Request: ${t.title}`,`${CU.name} requested to transfer "${t.title}" to ${toEmp.name}.\n\nReason: ${reason}\n\nLog in → Approvals to approve or reject.`).catch(()=>{});
   cm('m-transfer'); cm('m-task');
   updBadges();
   toast('Transfer request submitted! Manager will see it in Approvals.','ok');
@@ -3536,11 +3496,8 @@ function approveTransfer(ptId){
   db.pendingTransfers=db.pendingTransfers.filter(p=>p.id!==ptId);
   saveDB();
   notify({category:'task',icon:'🔄',title:'Task Transferred',msg:`"${pt.taskTitle}" has been transferred to you.`,for:'emp_'+pt.toId});
-  const ej=CU.ej||{};
-  if(ej.on){
-    const toEmp=getEmp(pt.toId);
-    if(toEmp?.email) sendEmail(toEmp.email,toEmp.name,`Task Assigned: ${pt.taskTitle}`,`A task has been transferred to you: "${pt.taskTitle}".\n\nSign in to WorkTrackr to view the task details.`);
-  }
+  const toEmp=getEmp(pt.toId);
+  if(toEmp?.email) sendEmail(toEmp.email,toEmp.name,`Task Assigned: ${pt.taskTitle}`,`A task has been transferred to you: "${pt.taskTitle}".\n\nSign in to WorkTrackr to view the task details.`).catch(()=>{});
   renderApprovals();updBadges();
   toast(`Transfer approved — task now assigned to ${pt.toName}.`,'ok');
 }
@@ -3589,8 +3546,7 @@ function assignTask(){
   saveDB();
   const emp=getEmp(empId);
   notify({category:'task',icon:'📋',title:'New Task Assigned',msg:`You've been assigned: "${title}". Due: ${due}.`,for:'emp_'+empId});
-  const mgrej=myMgr().ej||{};
-  if(myPrefs().assigned&&mgrej.on&&emp?.email) sendEmail(emp.email,emp.name,`New Task: ${title}`,`You have been assigned a new task:\n"${title}"\n\nDescription: ${desc}\nDue Date: ${due}\nPriority: ${pri}\n\nSign in to WorkTrackr for full details.`);
+  if(myPrefs().assigned&&emp?.email) sendEmail(emp.email,emp.name,`New Task: ${title}`,`You have been assigned a new task:\n"${title}"\n\nDescription: ${desc}\nDue Date: ${due}\nPriority: ${pri}\n\nSign in to WorkTrackr for full details.`);
   renderPage(document.querySelector('.page.on')?.id?.replace('page-',''));updBadges();
   toast('Task assigned!','ok');
 }
@@ -3644,8 +3600,7 @@ function createSelfTask(){
   saveDB();
   const _selfTaskMgrId=CU.managerId||(CU.managerIds?CU.managerIds[0]:null)||'';
 if(_selfTaskMgrId) notify({category:'task',icon:'📝',title:'Employee Created a Task',msg:`${CU.name} created: "${title}" (Due: ${due}).`,for:_selfTaskMgrId});
-  const mej=mgr.ej||{};
-  if(myPrefs().assigned&&mej.on&&mgrEmail()){
+  if(myPrefs().assigned&&mgrEmail()){
     sendEmail(mgrEmail(),'Manager',`New Task Created by ${CU.name}`,
       `${CU.name} has created a new task:\n\nTitle: ${title}\nDescription: ${desc||'—'}\nPriority: ${pri}\nDue Date: ${due}`);
   }
@@ -4165,7 +4120,7 @@ function saveMgrEmail(){
   const email=document.getElementById('s-mgr-identity').value.trim().toLowerCase();
   if(!email||!email.includes('@')){toast('Please enter a valid email address.','err');return;}
   const mgrEntry=db.managers.find(m=>m.id===CU.id);
-  if(mgrEntry){mgrEntry.email=email;if(mgrEntry.ej)mgrEntry.ej.me=email;}
+  if(mgrEntry){mgrEntry.email=email;}
   CU.email=email;
   saveDB();updateMgrEmailDisplay();
   toast('Manager email saved! Share this with your employees.','ok');
@@ -4197,13 +4152,7 @@ function updateMgrEmailDisplay(){
   el.style.color=CU.email?'var(--blue)':'var(--muted)';
 }
 
-function saveF2S(){
-  const key=document.getElementById('s-f2s').value.trim();
-  if(!key){toast('Please enter your Fast2SMS API key.','err');return;}
-  db.f2sKey=key;saveDB();
-  document.getElementById('f2s-status').textContent='✅ API key saved! Real OTPs will be sent.';
-  toast('Fast2SMS API key saved!','ok');
-}
+function saveF2S(){ /* removed — Fast2SMS tab gone */ }
 
 function loadSettings(){
   const isEmp = CU.role === 'employee';
@@ -4318,13 +4267,7 @@ function loadSettings(){
     const _bizInd=document.getElementById('s-biz-industry'); if(_bizInd) _bizInd.value=_mgr.businessIndustry||'';
     refreshBizPreview();
     switchStab('biz');
-    document.getElementById('s-f2s').value=db.f2sKey||'';
-    document.getElementById('f2s-status').textContent=db.f2sKey?'✅ Configured':'⚠ Not configured (Demo mode)';
-    const ej=CU.ej||{};
-    document.getElementById('s-pk').value=ej.pk||'';
-    document.getElementById('s-sid').value=ej.sid||'';
-    document.getElementById('s-tid').value=ej.tid||'';
-    document.getElementById('s-me').value=ej.me||CU.email||'';
+    // EmailJS credentials are hardcoded — no settings UI needed
     const prefs=CU.prefs||{};
     ['assigned','complete','blocked','review','overdue'].forEach(k=>{
       const el=document.getElementById('p-'+k);
@@ -4338,8 +4281,7 @@ function requestLinkManager(){
   if(!email||!email.includes('@')){toast('Please enter a valid manager email.','err');return;}
   const mgr=db.managers.find(m=>{
     const e1=(m.email||'').toLowerCase().trim();
-    const e2=(m.ej?.me||'').toLowerCase().trim();
-    return (e1&&e1===email)||(e2&&e2===email);
+    return (e1&&e1===email);
   });
   if(!mgr){toast('No manager found with that email. Ask them to check their registered email in Settings → Manager Identity Email.','err');return;}
   const emp=db.employees.find(e=>String(e.id)===String(CU.empId));
@@ -4445,103 +4387,83 @@ function saveMgrProfile(){
 }
 
 function saveSettings(){
-  const pk=document.getElementById('s-pk').value.trim();
-  const sid=document.getElementById('s-sid').value.trim();
-  const tid=document.getElementById('s-tid').value.trim();
-  const me=document.getElementById('s-me').value.trim();
-  if(!pk||!sid||!tid||!me){toast('Please fill in all EmailJS fields.','err');return;}
-  const ejConfig={pk,sid,tid,me,on:true};
+  // Notification prefs only — EmailJS is now hardcoded
   const prefs={};
   ['assigned','complete','blocked','review','overdue'].forEach(k=>{prefs[k]=document.getElementById('p-'+k).checked;});
   const mgrEntry=db.managers.find(m=>m.id===CU.id);
-  if(mgrEntry){mgrEntry.ej=ejConfig;mgrEntry.prefs=prefs;}
-  CU.ej=ejConfig;CU.prefs=prefs;
-  try{emailjs.init(pk);}catch(e){}
+  if(mgrEntry){mgrEntry.prefs=prefs;}
+  CU.prefs=prefs;
   saveDB();
-  document.getElementById('ej-banner').style.display='none';
-  toast('✅ EmailJS configured & saved!','ok');
+  toast('✅ Notification preferences saved!','ok');
 }
 
 function saveMgrEmailFromDash(){
   const email=document.getElementById('dash-mgr-email').value.trim().toLowerCase();
   if(!email||!email.includes('@')){toast('Please enter a valid email address.','err');return;}
   const mgrEntry=db.managers.find(m=>m.id===CU.id);
-  if(mgrEntry){mgrEntry.email=email;if(mgrEntry.ej)mgrEntry.ej.me=email;}
+  if(mgrEntry){mgrEntry.email=email;}
   CU.email=email;saveDB();
   document.getElementById('mgr-email-banner').style.display='none';
   alert(`✅ Manager email set!\n\nShare this with your employees:\n\n📧 ${email}\n\nEmployees enter this in the "Manager's Email" field when registering.`);
   toast('Manager email saved!','ok');
 }
 
-function saveEJconfig(){
-  const pk=document.getElementById('cfg-pk').value.trim();
-  const sid=document.getElementById('cfg-sid').value.trim();
-  const tid=document.getElementById('cfg-tid').value.trim();
-  if(!pk||!sid||!tid){toast('Please fill in all 3 fields.','err');return;}
-  const ejConfig={pk,sid,tid,me:CU.email||'',on:true};
-  const mgrEntry=db.managers.find(m=>m.id===CU.id);
-  if(mgrEntry) mgrEntry.ej=ejConfig;
-  CU.ej=ejConfig;
-  try{emailjs.init(pk);}catch(e){}
-  saveDB();
-  document.getElementById('ej-banner').style.display='none';
-  toast('EmailJS configured! Real emails enabled.','ok');
-}
-
-async function testEmail(){
-  const ej=CU.ej||{};
-  if(!ej.on||!ej.pk){toast('Please save your EmailJS configuration first.','err');return;}
-  const to=ej.me||CU.email;
-  if(!to){toast('Please set the Manager Email field first.','err');return;}
+// Legacy stubs — EmailJS config is now built-in, no UI config needed
+function saveEJconfig(){ toast('EmailJS is built-in — no configuration needed.','ok'); }
+function testEmail(){
+  const to = CU?.email || CU?.userId || '';
+  if(!to){ toast('No email address found on your account.','err'); return; }
   toast('Sending test email...','');
-  await sendEmail(to,'Manager','✅ WorkTrackr Test Email','This is a test email from WorkTrackr.\n\nIf you received this, your EmailJS configuration is working correctly!');
-  toast('Test email sent to '+to,' — check your inbox!','ok');
+  sendOTPEmail(to, CU.name||'Manager', '123456')
+    .then(()=>toast('📧 Test email sent to '+to+' — check your inbox!','ok'))
+    .catch(()=>toast('❌ Email send failed — check browser console.','err'));
 }
 
-// Hardcoded EmailJS public key — always available
-const EMAILJS_PUBLIC_KEY = '4zNTFOQK7t1uJlw2F';
+// ═══════════════════════════════════════════════════
+// EMAILJS — HARDCODED CREDENTIALS (no setup needed)
+// ═══════════════════════════════════════════════════
+const EMAILJS_SERVICE_ID  = 'service_3cpu65i';
+const EMAILJS_TEMPLATE_ID = 'template_munx4pr';
+const EMAILJS_PUBLIC_KEY  = '4zNTFOQK7t1uJlw2F';
+
+async function sendOTPEmail(toEmail, toName, otp){
+  if(!toEmail){ console.warn('[EmailJS] No recipient'); return; }
+  // Store OTP in localStorage for verification (as per your pattern)
+  localStorage.setItem('worktrackr_otp_'+toEmail, otp);
+  const params = {
+    to_email: toEmail,
+    to_name:  toName || 'User',
+    otp:      otp
+  };
+  try{
+    const result = await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, params);
+    console.log('[EmailJS] ✅ OTP sent to', toEmail, result);
+    return result;
+  }catch(e){
+    console.error('[EmailJS] ❌ Failed:', e);
+    throw e;
+  }
+}
 
 async function sendEmail(to, name, subj, msg){
+  // General email — reuses the same hardcoded service/template
   if(!to){ console.warn('[EmailJS] No recipient'); return; }
-  // CU may be null during account creation — scan all managers for a configured ej
-  const ejSource = CU?.ej?.sid ? CU.ej
-    : db.managers.find(m=>m.ej?.sid && m.ej?.tid)?.ej
-    || {};
-  const pk  = ejSource.pk  || EMAILJS_PUBLIC_KEY;
-  const sid = ejSource.sid || '';
-  const tid = ejSource.tid || '';
-  if(!sid || !tid){
-    console.warn('[EmailJS] Service ID or Template ID not set. Go to Settings → EmailJS Configuration and enter both.');
-    throw new Error('EmailJS Service ID / Template ID not configured');
-  }
-  try{ emailjs.init(pk); }catch(e){}
-  const result = await emailjs.send(sid, tid, {
+  const params = {
     to_email:  to,
     to_name:   name || 'User',
+    otp:       '',
     subject:   subj,
     message:   msg,
     from_name: 'WorkTrackr'
-  });
-  console.log('[EmailJS] ✅ Sent to', to, result);
-  return result;
-}
-
-// Send OTP via email — used when phone OTP is not available
-async function sendOTPEmail(toEmail, toName, otp){
-  await sendEmail(
-    toEmail,
-    toName,
-    'Your WorkTrackr OTP Code',
-    `Hi ${toName||''},
-
-Your One-Time Password (OTP) for WorkTrackr is:
-
-${otp}
-
-This OTP is valid for 5 minutes. Do not share it with anyone.
-
-— WorkTrackr Team`
-  );
+  };
+  try{
+    const result = await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, params);
+    console.log('[EmailJS] ✅ Email sent to', to, result);
+    return result;
+  }catch(e){
+    console.error('[EmailJS] ❌ Failed:', e);
+    throw e;
+  }
 }
 
 // ═══════════════════════════════════════════════════
@@ -5933,8 +5855,8 @@ function checkOverdue(){
     const already=db.notifications.find(n=>n.taskId===t.id&&n.title==='Task Overdue');
     if(!already){
       notify({icon:'⚠️',title:'Task Overdue',msg:`"${t.title}" (${getEmp(t.assignedTo)?.name}) is past its deadline.`,for:CU.id,taskId:t.id});
-      const ej=CU.ej||{};
-      if((CU.prefs||{}).overdue&&ej.on&&ej.me) sendEmail(ej.me,'Manager',`Overdue: ${t.title}`,`Task "${t.title}" assigned to ${getEmp(t.assignedTo)?.name} was due on ${t.due}.`);
+      const _mgrMe=mgrEmail();
+      if((CU.prefs||{}).overdue&&_mgrMe) sendEmail(_mgrMe,'Manager',`Overdue: ${t.title}`,`Task "${t.title}" assigned to ${getEmp(t.assignedTo)?.name} was due on ${t.due}.`).catch(()=>{});
     }
   });
 }
@@ -7365,7 +7287,7 @@ function renderPersonView(){
 // =====================================================
 // SETTINGS TABS (Manager)
 // =====================================================
-const STABS = ['biz','profile','roles','policy','gps','integr','notif','data'];
+const STABS = ['biz','profile','roles','policy','gps','notif','data'];
 function switchStab(tab){
   STABS.forEach(t=>{
     const btn = document.getElementById('stab-'+t);
