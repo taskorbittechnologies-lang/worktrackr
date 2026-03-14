@@ -2829,11 +2829,97 @@ function enterApp(user){
   pg('dashboard');
   checkOverdue();
   setTimeout(spawnRecurringTasks, 800);
-  setTimeout(checkAndShowChangelog, 1200); // Show changelog after UI loads // spawn any due recurring tasks
-  setTimeout(checkBirthday, 1800); // Birthday popup after everything loads
-  setTimeout(checkWorkAnniversary, 2800); // Work anniversary popup
+  setTimeout(checkAndShowChangelog, 1200);
+  setTimeout(checkBirthday, 1800);
+  setTimeout(checkWorkAnniversary, 2800);
+  startInactivityTimer(); // Auto-logout after 10 min inactivity
 }
-function logout(){CU=null;document.getElementById('app').style.display='none';document.getElementById('auth').style.display='flex';atab('login');}
+function logout(){
+  stopInactivityTimer();
+  CU=null;
+  document.getElementById('app').style.display='none';
+  document.getElementById('auth').style.display='flex';
+  atab('login');
+}
+
+// ═══════════════════════════════════════════════════
+// AUTO-LOGOUT (10 min inactivity)
+// ═══════════════════════════════════════════════════
+const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes
+const INACTIVITY_WARN  =  1 * 60 * 1000; // warn at 1 min remaining
+let _inactivityTimer = null;
+let _inactivityWarnTimer = null;
+let _inactivityWarnInterval = null;
+let _inactivityWarnVisible = false;
+
+function _resetInactivityTimer(){
+  if(!CU) return;
+  clearTimeout(_inactivityTimer);
+  clearTimeout(_inactivityWarnTimer);
+  // Hide warning if shown and user is active
+  if(_inactivityWarnVisible) _hideInactivityWarn();
+
+  // Set warning timer (fires 1 min before logout)
+  _inactivityWarnTimer = setTimeout(()=>{
+    if(!CU) return;
+    _showInactivityWarn();
+  }, INACTIVITY_LIMIT - INACTIVITY_WARN);
+
+  // Set logout timer
+  _inactivityTimer = setTimeout(()=>{
+    if(!CU) return;
+    _hideInactivityWarn();
+    toast('🔒 You were logged out due to 10 minutes of inactivity.','warn');
+    setTimeout(()=>logout(), 800);
+  }, INACTIVITY_LIMIT);
+}
+
+function _showInactivityWarn(){
+  _inactivityWarnVisible = true;
+  const modal = document.getElementById('inactivity-modal');
+  if(!modal) return;
+  modal.style.display = 'flex';
+  let secs = 60;
+  const countdown = modal.querySelector('#inactivity-countdown');
+  if(countdown) countdown.textContent = secs;
+  clearInterval(_inactivityWarnInterval);
+  _inactivityWarnInterval = setInterval(()=>{
+    secs--;
+    if(countdown) countdown.textContent = secs;
+    if(secs <= 0){ clearInterval(_inactivityWarnInterval); }
+  }, 1000);
+}
+
+function _hideInactivityWarn(){
+  _inactivityWarnVisible = false;
+  clearInterval(_inactivityWarnInterval);
+  const modal = document.getElementById('inactivity-modal');
+  if(modal) modal.style.display = 'none';
+}
+
+function stayLoggedIn(){
+  _hideInactivityWarn();
+  _resetInactivityTimer();
+  toast('✅ Session extended.','ok');
+}
+
+function startInactivityTimer(){
+  // Track all user interaction events
+  ['mousemove','mousedown','keydown','touchstart','touchmove','scroll','click'].forEach(ev=>{
+    document.addEventListener(ev, _resetInactivityTimer, {passive:true});
+  });
+  _resetInactivityTimer();
+}
+
+function stopInactivityTimer(){
+  clearTimeout(_inactivityTimer);
+  clearTimeout(_inactivityWarnTimer);
+  clearInterval(_inactivityWarnInterval);
+  _hideInactivityWarn();
+  ['mousemove','mousedown','keydown','touchstart','touchmove','scroll','click'].forEach(ev=>{
+    document.removeEventListener(ev, _resetInactivityTimer);
+  });
+}
 
 // ═══════════════════════════════════════════════════
 // NAVIGATION
@@ -4417,28 +4503,27 @@ const EMAILJS_PUBLIC_KEY = '4zNTFOQK7t1uJlw2F';
 
 async function sendEmail(to, name, subj, msg){
   if(!to){ console.warn('[EmailJS] No recipient'); return; }
-  const ej = CU?.ej || {};
-  // Use manager's custom service+template if configured, otherwise use hardcoded defaults
-  const sid = ej.sid || db.managers[0]?.ej?.sid || '';
-  const tid = ej.tid || db.managers[0]?.ej?.tid || '';
+  // CU may be null during account creation — scan all managers for a configured ej
+  const ejSource = CU?.ej?.sid ? CU.ej
+    : db.managers.find(m=>m.ej?.sid && m.ej?.tid)?.ej
+    || {};
+  const pk  = ejSource.pk  || EMAILJS_PUBLIC_KEY;
+  const sid = ejSource.sid || '';
+  const tid = ejSource.tid || '';
   if(!sid || !tid){
-    console.log('[EmailJS] Service/Template ID not set — email not sent. Configure in Settings → EmailJS.');
-    return;
+    console.warn('[EmailJS] Service ID or Template ID not set. Go to Settings → EmailJS Configuration and enter both.');
+    throw new Error('EmailJS Service ID / Template ID not configured');
   }
-  // Always re-init with the correct key
-  try{ emailjs.init(ej.pk || EMAILJS_PUBLIC_KEY); }catch(e){}
-  try{
-    await emailjs.send(sid, tid, {
-      to_email: to,
-      to_name:  name || 'User',
-      subject:  subj,
-      message:  msg,
-      from_name:'WorkTrackr'
-    });
-    console.log('[EmailJS] ✅ Sent to', to);
-  }catch(e){
-    console.error('[EmailJS] ❌ Failed:', e);
-  }
+  try{ emailjs.init(pk); }catch(e){}
+  const result = await emailjs.send(sid, tid, {
+    to_email:  to,
+    to_name:   name || 'User',
+    subject:   subj,
+    message:   msg,
+    from_name: 'WorkTrackr'
+  });
+  console.log('[EmailJS] ✅ Sent to', to, result);
+  return result;
 }
 
 // Send OTP via email — used when phone OTP is not available
@@ -8055,6 +8140,22 @@ function _renderGpsBanner(){
     <div id="bday-name" style="font-size:26px;font-weight:900;background:linear-gradient(135deg,#f59e0b,#ec4899);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-family:'Poppins',sans-serif;margin-bottom:14px;"></div>
     <div style="font-size:14px;color:#6b7a8d;line-height:1.7;margin-bottom:22px;">🎉 Wishing you a wonderful day filled with joy and happiness!<br>The entire <strong>WorkTrackr</strong> team wishes you all the best! 🌟</div>
     <button onclick="document.getElementById('bday-modal').style.display='none'" style="background:linear-gradient(135deg,#f59e0b,#ec4899);color:#fff;border:none;padding:12px 28px;border-radius:12px;font-family:'Poppins',sans-serif;font-weight:700;font-size:14px;cursor:pointer;">🎊 Thank You!</button>
+  </div>
+</div>
+
+<!-- Auto-Logout Inactivity Warning Modal -->
+<div id="inactivity-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99999;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:#fff;border-radius:20px;padding:32px 28px;width:100%;max-width:380px;box-shadow:0 24px 60px rgba(0,0,0,.3);text-align:center;position:relative;">
+    <div style="font-size:48px;margin-bottom:12px;">⏱️</div>
+    <div style="font-family:'Poppins',sans-serif;font-weight:800;font-size:18px;color:#1a2340;margin-bottom:8px;">Still there?</div>
+    <div style="font-size:14px;color:#6b7a8d;line-height:1.7;margin-bottom:18px;">
+      You've been inactive for a while.<br>
+      You'll be automatically logged out in
+    </div>
+    <div style="font-family:'Poppins',sans-serif;font-size:52px;font-weight:900;color:#e53e3e;line-height:1;margin-bottom:6px;" id="inactivity-countdown">60</div>
+    <div style="font-size:12px;color:#9ca3af;margin-bottom:24px;">seconds</div>
+    <button onclick="stayLoggedIn()" style="width:100%;background:linear-gradient(135deg,#1e4db7,#0694a2);color:#fff;border:none;padding:14px;border-radius:12px;font-family:'Poppins',sans-serif;font-weight:700;font-size:15px;cursor:pointer;margin-bottom:10px;">✅ Yes, keep me logged in</button>
+    <button onclick="logout()" style="width:100%;background:transparent;color:#9ca3af;border:1.5px solid #e2e8f0;padding:11px;border-radius:12px;font-family:'Poppins',sans-serif;font-weight:600;font-size:13px;cursor:pointer;">Sign out now</button>
   </div>
 </div>
 
