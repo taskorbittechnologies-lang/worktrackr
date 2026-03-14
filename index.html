@@ -2703,14 +2703,15 @@ async function createManagerDirect(){
     await sendOTPEmail(email, name, otp);
     toast('📧 OTP sent to '+email+' — check your inbox','ok');
   }catch(e){
-    // Show OTP inline if email fails
+    const reason = e?.message || e?.text || 'Unknown error';
+    console.error('[OTP] Manager signup failed:', reason);
     const demoEl = document.getElementById('ms-otp-demo');
     if(demoEl){
       demoEl.style.display='block';
-      demoEl.innerHTML='⚠️ Email delivery issue. Your OTP is: <span style="font-size:20px;font-weight:900;letter-spacing:3px;color:#b45309;">'+otp+'</span>';
+      demoEl.innerHTML='⚠️ Email failed: '+reason+'. Your OTP: <span style="font-size:20px;font-weight:900;letter-spacing:3px;color:#b45309;">'+otp+'</span>';
       otp.split('').forEach((ch,i)=>{const el=document.getElementById('mo'+(i+1));if(el)el.value=ch;});
     }
-    toast('⚠️ Could not send email — OTP shown above','warn');
+    toast('⚠️ Email failed: '+reason,'warn');
   }
 }
 
@@ -3919,12 +3920,14 @@ async function addEmployee(){
     await sendOTPEmail(email, name, otp);
     toast('📧 OTP sent to '+email,'ok');
   }catch(e){
+    const reason = e?.message || e?.text || 'Unknown error';
+    console.error('[OTP] Employee creation failed:', reason);
     if(demoEl){
       demoEl.style.display='block';
-      demoEl.innerHTML='⚠️ Email delivery issue. Share this OTP with the employee: <span style="font-size:20px;font-weight:900;letter-spacing:3px;color:#b45309;">'+otp+'</span>';
+      demoEl.innerHTML='⚠️ Email failed: '+reason+'. OTP for employee: <span style="font-size:20px;font-weight:900;letter-spacing:3px;color:#b45309;">'+otp+'</span>';
       otp.split('').forEach((ch,i)=>{const el=document.getElementById('eo'+(i+1));if(el)el.value=ch;});
     }
-    toast('⚠️ Could not send email — OTP shown in modal','warn');
+    toast('⚠️ Email failed: '+reason,'warn');
   }
 }
 
@@ -4428,20 +4431,21 @@ const EMAILJS_PUBLIC_KEY  = '4zNTFOQK7t1uJlw2F';
 
 async function sendOTPEmail(toEmail, toName, otp){
   if(!toEmail){ console.warn('[EmailJS] No recipient'); return; }
-  // Store OTP in localStorage for verification (as per your pattern)
   localStorage.setItem('worktrackr_otp_'+toEmail, otp);
   const params = {
     to_email: toEmail,
     to_name:  toName || 'User',
-    otp:      otp
+    otp:      String(otp)
   };
+  console.log('[EmailJS] Sending OTP to:', toEmail, '| Service:', EMAILJS_SERVICE_ID, '| Template:', EMAILJS_TEMPLATE_ID);
   try{
     const result = await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, params);
-    console.log('[EmailJS] ✅ OTP sent to', toEmail, result);
+    console.log('[EmailJS] ✅ OTP sent:', result);
     return result;
   }catch(e){
-    console.error('[EmailJS] ❌ Failed:', e);
-    throw e;
+    const reason = e?.text || e?.message || JSON.stringify(e);
+    console.error('[EmailJS] ❌ Failed — Reason:', reason, '| Full error:', e);
+    throw new Error(reason);
   }
 }
 
