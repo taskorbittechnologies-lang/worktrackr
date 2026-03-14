@@ -2292,7 +2292,7 @@ function atab(t){
   });
   document.getElementById('auth-err').style.display='none';
   if(t==='forgot')showFpStep(1);
-  if(t==='manager-setup')checkExistingMgr();
+  if(t==='manager-setup'){ checkExistingMgr(); mgrSetupReset(); }
 }
 function aerr(m){
   const e=document.getElementById('auth-err');
@@ -2643,9 +2643,33 @@ const ADMIN_SETUP_CODE = 'ADMIN2024';
 
 function checkExistingMgr(){ /* warning removed */ }
 
+function mgrSetupReset(){
+  // Clear all fields so user must re-enter from scratch
+  ['ms-name','ms-email','ms-phone','ms-pw','ms-conf','ms-link-email'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.value='';
+  });
+  // Reset password strength bar
+  const pwBar=document.getElementById('pwbar-mgr');
+  const pwHint=document.getElementById('pwhint-mgr');
+  if(pwBar){pwBar.style.width='0';pwBar.style.background='';}
+  if(pwHint) pwHint.textContent='Min. 6 characters';
+  // Reset OTP state
+  clearInterval(otpState.timerInterval);
+  otpState.code=''; otpState.regData=null; otpState.verified=false;
+  // Hide OTP demo/ok boxes
+  const demoEl=document.getElementById('ms-otp-demo');
+  if(demoEl) demoEl.style.display='none';
+  const okEl=document.getElementById('ms-otp-ok');
+  if(okEl) okEl.style.display='none';
+  // Always show step 1
+  const s1=document.getElementById('mgr-setup-step1');
+  const s2=document.getElementById('mgr-setup-step2');
+  if(s1) s1.style.display='block';
+  if(s2) s2.style.display='none';
+}
+
 function mgrSetupBack(){
-  document.getElementById('mgr-setup-step1').style.display='block';
-  document.getElementById('mgr-setup-step2').style.display='none';
+  mgrSetupReset();
   aclear();
 }
 
@@ -4039,14 +4063,41 @@ function unlinkEmp(eid){
 // METRICS
 // ═══════════════════════════════════════════════════
 function renderMetrics(){
-  const tasks=db.tasks;
+  const _mId = String(CU.id);
+
+  // Only this manager's employees
+  const myEmpsMet = db.employees.filter(e=>{
+    const ids=(e.managerIds||(e.managerId!=null?[e.managerId]:[])).map(String);
+    return ids.includes(_mId);
+  });
+
+  // Only this manager's tasks
+  const tasks = db.tasks.filter(t=>t.managerId===CU.id);
+
+  // If no employees AND no tasks — show a clean empty state for everything
+  const metGrid = document.getElementById('met-grid');
+  const metReasons = document.getElementById('met-reasons');
+  const bel = document.getElementById('met-by-emp');
+
+  if(!myEmpsMet.length && !tasks.length){
+    metGrid.innerHTML=`
+      <div class="mc" style="grid-column:1/-1;text-align:center;padding:32px 20px;">
+        <div style="font-size:40px;margin-bottom:10px;">👥</div>
+        <div style="font-family:'Poppins',sans-serif;font-weight:700;font-size:15px;color:var(--text);margin-bottom:6px;">No team data yet</div>
+        <div style="font-size:13px;color:var(--muted);line-height:1.6;">Add team members from the <strong>Team Members</strong> tab and assign tasks to see metrics here.</div>
+      </div>`;
+    metReasons.innerHTML='<div style="color:var(--muted);font-size:13px;padding:8px 0;">No data yet.</div>';
+    bel.innerHTML='<div style="color:var(--muted);font-size:13px;padding:8px 0;">No team members yet. Add employees from the Team Members tab.</div>';
+    return;
+  }
+
   const done=tasks.filter(t=>t.status==='complete');
   const pct=tasks.length?Math.round(done.length/tasks.length*100):0;
   // Avg completion time (days)
   const times=done.filter(t=>t.createdAt&&t.completedAt).map(t=>(new Date(t.completedAt)-new Date(t.createdAt))/(1000*60*60*24));
   const avg=times.length?Math.round(times.reduce((a,b)=>a+b,0)/times.length):0;
   const overdueCnt=tasks.filter(isOverdue).length;
-  document.getElementById('met-grid').innerHTML=`
+  metGrid.innerHTML=`
     <div class="mc"><div class="mc-h">Completion Rate</div><div class="mc-v" style="color:var(--green)">${pct}%</div><div class="mc-sub">${done.length} of ${tasks.length} tasks completed</div><div class="bar-wrap"><div class="bar-fill" style="width:${pct}%;background:var(--green)"></div></div></div>
     <div class="mc"><div class="mc-h">Avg. Days to Complete</div><div class="mc-v" style="color:var(--blue)">${avg}</div><div class="mc-sub">days from creation to completion</div></div>
     <div class="mc"><div class="mc-h">Currently Overdue</div><div class="mc-v" style="color:var(--red)">${overdueCnt}</div><div class="mc-sub">tasks past their due date</div></div>
@@ -4061,28 +4112,20 @@ function renderMetrics(){
   });
   const reasonCounts={};reasons.forEach(r=>{const key=r.length>40?r.substring(0,40)+'...':r;reasonCounts[key]=(reasonCounts[key]||0)+1;});
   const maxR=Math.max(1,...Object.values(reasonCounts));
-  const rel=document.getElementById('met-reasons');
   const rkeys=Object.entries(reasonCounts).sort((a,b)=>b[1]-a[1]).slice(0,5);
-  rel.innerHTML=rkeys.length?rkeys.map(([r,cnt])=>`
+  metReasons.innerHTML=rkeys.length?rkeys.map(([r,cnt])=>`
     <div class="reason-row">
       <div class="reason-label">${r}</div>
       <div class="reason-bar"><div class="bar-wrap"><div class="bar-fill" style="width:${(cnt/maxR)*100}%;background:var(--orange)"></div></div></div>
       <div class="reason-count">${cnt}x</div>
     </div>`).join(''):'<div style="color:var(--muted);font-size:13px;">No blocked tasks yet.</div>';
 
-  // By employee — only this manager's team
-  const bel=document.getElementById('met-by-emp');
-  const _mId=String(CU.id);
-  const myEmpsMet=db.employees.filter(e=>{
-    const ids=(e.managerIds||(e.managerId!=null?[e.managerId]:[])).map(String);
-    return ids.includes(_mId);
-  });
-  const myTasksMet=tasks.filter(t=>t.managerId===CU.id);
+  // By employee
   if(!myEmpsMet.length){
     bel.innerHTML='<div style="color:var(--muted);font-size:13px;padding:8px 0;">No team members yet. Add employees from the Team Members tab.</div>';
   } else {
     bel.innerHTML=myEmpsMet.map(e=>{
-      const et=myTasksMet.filter(t=>String(t.assignedTo)===String(e.id));
+      const et=tasks.filter(t=>String(t.assignedTo)===String(e.id));
       const ep=et.length?Math.round(et.filter(t=>t.status==='complete').length/et.length*100):0;
       return `<div style="margin-bottom:10px;"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;"><span>${e.name}</span><span style="color:var(--green);font-weight:600">${ep}%</span></div><div class="bar-wrap"><div class="bar-fill" style="width:${ep}%;background:var(--green)"></div></div></div>`;
     }).join('');
