@@ -4435,7 +4435,9 @@ async function sendOTPEmail(toEmail, toName, otp){
   const params = {
     to_email: toEmail,
     to_name:  toName || 'User',
-    otp:      String(otp)
+    otp:      String(otp),
+    passcode: String(otp),
+    time:     '5 minutes'
   };
   console.log('[EmailJS] Sending OTP to:', toEmail, '| Service:', EMAILJS_SERVICE_ID, '| Template:', EMAILJS_TEMPLATE_ID);
   try{
